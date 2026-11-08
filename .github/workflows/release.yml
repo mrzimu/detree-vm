@@ -60,6 +60,14 @@ jobs:
               "$python" -m auditwheel repair raw/*.whl -w dist
             '
 
+      - uses: astral-sh/setup-uv@v7
+        if: ${{ !matrix.image }}
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: ${{ !matrix.image }}
+
       - name: Build native wheel
         if: ${{ !matrix.image }}
         shell: bash
