@@ -1,7 +1,10 @@
 name: Lint PR
 
+# `pull_request`, not `pull_request_target`: from 2026-12-02 GitHub blocks the
+# target trigger by default in public repositories, and this check only reads
+# the event payload, so it needs neither the base checkout nor a secret.
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - edited
@@ -20,15 +23,3 @@ jobs:
       - uses: amannn/action-semantic-pull-request@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            build
-            chore
-            ci
-            docs
-            feat
-            fix
-            perf
-            refactor
-            revert
-            test
