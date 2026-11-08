@@ -1,0 +1,71 @@
+ci:
+  autoupdate_commit_msg: 'chore: update pre-commit hooks'
+  autofix_commit_msg: 'style: pre-commit fixes'
+  autoupdate_schedule: monthly
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+        exclude: ^tests/data/
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+        exclude: ^\.clang-format$
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 26.10.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix, --show-fixes]
+
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.16.0
+    hooks:
+      - id: pretty-format-toml
+        args: [--autofix]
+      - id: pretty-format-yaml
+        args: [--autofix, --indent, '2', --offset, '2']
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+
+  # `rustfmt` needs a Rust toolchain. Developers without one can run
+  # `SKIP=rustfmt pre-commit run --all-files`; CI runs `cargo fmt --check`
+  # in the Rust job.
+  - repo: local
+    hooks:
+      - id: rustfmt
+        name: rustfmt
+        entry: cargo fmt --manifest-path kernel/rust/Cargo.toml --all -- --check
+        language: system
+        files: \.rs$
+        pass_filenames: false
+      - id: gen-isa
+        name: ISA tables are current
+        entry: python3 tools/gen_isa.py --check
+        language: system
+        files: ^(spec/isa\.toml|docs/spec/isa\.md|src/detree/spec/(isa|opinfo)\.py|kernel/cpp/src/isa\.hpp|kernel/rust/src/isa\.rs|tools/gen_isa\.py)$
+        pass_filenames: false
+      - id: gen-opt
+        name: optimizer document is current
+        entry: python3 tools/gen_opt.py --check
+        language: system
+        files: ^(spec/opt\.toml|docs/spec/ir\.md|dev/impl/optimizer\.md|src/detree/opt/.*\.py|tools/gen_opt\.py)$
+        pass_filenames: false

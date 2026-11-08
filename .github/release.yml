@@ -1,0 +1,22 @@
+changelog:
+  categories:
+    - title: Breaking Changes
+      labels:
+        - breaking
+    - title: New Features
+      labels:
+        - feature
+    - title: Performance Improvements
+      labels:
+        - performance
+    - title: Bug Fixes
+      labels:
+        - bug fix
+    - title: Documentation, Tests, and CI
+      labels:
+        - documentation
+        - tests
+        - ci
+    - title: Other Changes
+      labels:
+        - '*'

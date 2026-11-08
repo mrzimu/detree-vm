@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The wheel is py3-none, so one compiled library serves every
+        # interpreter; the matrix runs the pure-Python and the compiled paths
+        # against every interpreter the metadata claims.
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+          enable-cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install
+        run: uv pip install -e . --group dev
+      - name: Pre-commit
+        if: matrix.python-version == '3.13'
+        run: uv run pre-commit run --all-files
+        env:
+          SKIP: rustfmt
+      - name: Tests
+        run: uv run pytest -q
+
+  cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: cmake -S kernel -B build/cpp -DDETREE_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build/cpp -j4
+      - name: Test
+        run: ctest --test-dir build/cpp --output-on-failure
+
+  sanitizers:
+    # The C++ machine is the porting reference, so undefined behavior there is
+    # worth catching even though the release ships Rust.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: >
+          cmake -S kernel -B build/sanitize -DDETREE_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build
+        run: cmake --build build/sanitize -j4
+      - name: Test
+        run: ctest --test-dir build/sanitize --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format
+        run: cargo fmt --manifest-path kernel/rust/Cargo.toml --all -- --check
+      - name: Test
+        run: cargo test --manifest-path kernel/rust/Cargo.toml
+      - name: Build
+        run: cargo build --manifest-path kernel/rust/Cargo.toml --release
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+          activate-environment: true
+          enable-cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install both machines
+        run: DETREE_SHIP_BACKEND=both uv pip install -e . --group dev
+      - name: Backend identity
+        run: uv run pytest -q tests/test_backends.py
+      - name: Python reference
+        run: DETREE_BACKEND=python uv run pytest -q
+      - name: C++ machine
+        run: DETREE_BACKEND=cpp uv run pytest -q
+      - name: Rust machine
+        run: DETREE_BACKEND=rust uv run pytest -q
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: ISA tables
+        run: python3 tools/gen_isa.py --check
+      - name: Optimizer document
+        run: python3 tools/gen_opt.py --check
+      - name: Documentation
+        run: python3 tools/check_docs.py
+      - name: Golden corpus
+        run: python3 tools/golden.py --check
+
+  package:
+    # The release artifact is part of the product: build it on every change and
+    # check the wheel contract (one Rust library, the C header, a py3-none tag)
+    # before a tag ever exists.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: |
+          uv build --wheel --out-dir dist
+          uv build --sdist --out-dir dist
+      - name: Wheel contract
+        run: python3 tools/inspect_wheel.py dist/*.whl
+      - name: Sdist carries the build sources
+        run: |
+          tar -tzf dist/*.tar.gz > sdist.txt
+          for path in kernel/cpp/CMakeLists.txt kernel/rust/src/lib.rs kernel/rust/Cargo.toml spec/isa.toml; do
+            grep -q "/$path$" sdist.txt || { echo "missing $path"; exit 1; }
+          done
+      - name: Install the wheel in a clean environment
+        run: |
+          uv venv /tmp/detree-wheel
+          uv pip install --python /tmp/detree-wheel/bin/python --no-deps \
+            --find-links dist --prerelease=allow detree-vm
+          uv pip install --python /tmp/detree-wheel/bin/python numpy
+          /tmp/detree-wheel/bin/python -m detree backends

@@ -1,0 +1,101 @@
+[build-system]
+build-backend = "scikit_build_core.build"
+requires = ["scikit-build-core>=0.10", "setuptools-scm>=8"]
+
+[dependency-groups]
+dev = ["pytest", "pytest-subtests", "pre-commit"]
+docs = [
+  "furo",
+  "myst-parser",
+  "numpy",
+  "sphinx",
+  "sphinx-copybutton",
+  "sphinx-autobuild",
+  "sphinxcontrib-mermaid"
+]
+
+[project]
+authors = [{ name = "Mingrun Li", email = "mrli@ihep.ac.cn" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX",
+  "Operating System :: Unix",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Software Development",
+  "Topic :: Utilities"
+]
+dependencies = ["numpy>=1.21"]
+description = "A domain-specific bytecode virtual machine for deserializing TTree binary streams"
+dynamic = ["version"]
+license = "MIT"
+license-files = ["LICENSE"]
+name = "detree-vm"
+readme = "README.md"
+requires-python = ">=3.9"
+
+[project.urls]
+Homepage = "https://github.com/mrzimu/detree-vm"
+
+[tool.black]
+exclude = "/(build|dist|env|.git|.tox|.eggs|.venv|kernel/rust/target)/"
+line-length = 95
+target-version = ["py39", "py310", "py311", "py312", "py313", "py314"]
+
+[[tool.dynamic-metadata]]
+field = "version"
+provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 95
+target-version = "py39"
+
+[tool.ruff.lint]
+ignore = ["E501"]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+cmake.build-type = "Release"
+cmake.source-dir = "kernel"
+wheel.packages = ["src/detree"]
+wheel.py-api = "py3"
+
+# A source install compiles the Rust machine, so the sdist must carry the C++
+# and Rust sources, the spec, and the tools that generate the tables. Being
+# explicit beats relying on a VCS file list: a release build must not depend on
+# the archive containing files it was never told about.
+[tool.scikit-build.sdist]
+include = [
+  ".clang-format",
+  ".pre-commit-config.yaml",
+  "docs/**",
+  "examples/**",
+  "kernel/**",
+  "spec/**",
+  "src/detree/_version.py",
+  "tests/**",
+  "tools/**"
+]
+
+[tool.setuptools_scm]
+fallback_version = "0.1.0.dev0"
+version_file = "src/detree/_version.py"
+
+[tool.uv]
+default-groups = ["dev"]

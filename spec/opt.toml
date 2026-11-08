@@ -1,0 +1,316 @@
+# Optimizer passes, in the order the pass manager runs them.
+#
+# This file is the single source of truth for what the optimizer does.
+# `tools/gen_opt.py` renders the table in docs/spec/ir.md §9 and the per-pass page
+# dev/impl/optimizer.md from it, and fails when either drifts from this file
+# or when src/detree/opt/manager.py disagrees with the order and levels here.
+#
+# Fields:
+# name          the pass function name in src/detree/opt/
+# phase         ir (a rewrite over the IR), lower, or machine
+# level         1 (always on) or 2 (on for the default pipeline)
+# matches       what the pass looks for
+# rewrites      what it produces
+# must_not_fire the condition that keeps it from firing
+# value         high, medium, or small
+# before/after  a short IR excerpt, in `detree.ir.dump` spelling
+# tests         test functions in tests/test_opt.py that pin the rewrite
+
+[meta]
+order_note = "The manager runs this order to a fixed point, at most eight rounds."
+status = "Pre-release: passes may be added, removed, or reordered without a version bump."
+
+[[pass]]
+after = 'assign local(x) = const(5)'
+before = 'assign local(x) = binary(ADD, const(2), const(3))'
+level = 1
+matches = "an arithmetic, unary, or comparison node whose operands are constants"
+must_not_fire = "a division by zero, or the signed minimum divided by -1, would be hidden"
+name = "const_fold"
+phase = "ir"
+rewrites = "the same node folded to one constant"
+tests = ["test_const_fold_arithmetic", "test_const_fold_leaves_division_by_zero"]
+value = "high"
+
+[[pass]]
+after = 'buf_append 0 = const(1)'
+before = '''if const(1):
+  buf_append 0 = const(1)
+else:
+  buf_append 0 = const(0)'''
+level = 1
+matches = "an If or While whose condition is a constant"
+must_not_fire = "the condition is not a literal constant, or an arm has an effect the other does not"
+name = "const_branch"
+phase = "ir"
+rewrites = "the arm the constant selects, or nothing when no arm can run"
+tests = ["test_const_branch_keeps_one_arm", "test_const_branch_drops_a_false_while"]
+value = "high"
+
+[[pass]]
+after = 'skip_tobject'
+before = '''skip_version
+assign local(unique) = stream_read(int32)
+assign local(bits) = stream_read(uint32)
+if binary(AND, local(bits), const(16)):
+  skip 2'''
+level = 2
+matches = "a skipped object header: a version, an unused id, a bits word that only decides whether two more bytes follow"
+must_not_fire = "the id or the bits word is read anywhere else, or the conditional skip is not exactly two bytes"
+name = "tobject_fusion"
+phase = "ir"
+rewrites = "SkipTObject, which reads the same bytes in one instruction"
+tests = ["test_tobject_fusion", "test_tobject_fusion_needs_the_reference_skip"]
+value = "high"
+
+[[pass]]
+after = '<dropped>'
+before = 'assign local(dead) = const(5)'
+level = 1
+matches = "an assignment whose local is never read"
+must_not_fire = "the node is a read, skip, buffer, state, reference, or string mutation"
+name = "dead_code"
+phase = "ir"
+rewrites = "the statement list without that assignment"
+tests = ["test_dead_code_drops_an_unused_pure_assignment"]
+value = "high"
+
+[[pass]]
+after = '''if binary(AND, local(version), const(16384)):
+  call_stmt <none> = call(3, <none>)'''
+before = '''assign local(flag) = unary(NOT_B, binary(AND, local(version), const(16384)))
+if local(flag):
+  call_stmt <none> = call(3, <none>)'''
+level = 2
+matches = "a local assigned once and read once, as the condition of a later If or While in the same body"
+must_not_fire = "the value has a side effect, the local is assigned or read more than once, or a loop condition would re-evaluate a value that is not loop-stable"
+name = "condition_locals"
+phase = "ir"
+rewrites = "the condition with the assigned value; the assignment is dropped"
+tests = ["test_condition_locals_folds_a_flag"]
+value = "high"
+
+[[pass]]
+after = 'buf_append_const 0 = 7'
+before = 'buf_append 0 = const(7)'
+level = 1
+matches = "BufferAppend whose value is a constant"
+must_not_fire = "the constant is not representable in the buffer's dtype"
+name = "literal_append"
+phase = "ir"
+rewrites = "BufferAppendConst, which needs no register"
+tests = ["test_literal_append"]
+value = "small"
+
+[[pass]]
+after = 'read_append 0 tc=int32'
+before = 'buf_append 0 = stream_read(int32)'
+level = 1
+matches = "BufferAppend of a StreamRead"
+must_not_fire = "the read value is used anywhere else"
+name = "read_append_fusion"
+phase = "ir"
+rewrites = "ReadAppend, one instruction per scalars"
+tests = ["test_read_append_fusion"]
+value = "high"
+
+[[pass]]
+after = 'read_bulk 1 tc=float64 count=local(count)'
+before = '''for i in range(const(0), local(count), step=1):
+  call_stmt <none> = call(4, <none>)'''
+level = 2
+matches = "a unit-stride counted loop whose body is one fixed-size read, directly or through a call"
+must_not_fire = "the body has another effect, the stride is not one, or the bound reads the loop variable"
+name = "bulk_fusion"
+phase = "ir"
+rewrites = "one ReadBulk with the loop count as an operand"
+tests = ["test_bulk_fusion", "test_bulk_fusion_keeps_a_runtime_count"]
+value = "high"
+
+[[pass]]
+after = 'read_bulk_until 1 tc=int32 end=local(end)'
+before = '''while compare(CMP_LT_S, cursor(), local(end)):
+  read_append 1 tc=int32'''
+level = 2
+matches = "a loop that reads one fixed-size element and stops when the cursor reaches an end position"
+must_not_fire = "the condition is not `cursor < end`, the body has more than one effect, or the element size varies"
+name = "bulk_until_fusion"
+phase = "ir"
+rewrites = "one ReadBulkUntil, which reads the rest of the entry in one dispatch"
+tests = ["test_bulk_until_fusion", "test_bulk_until_fusion_leaves_another_condition"]
+value = "high"
+
+[[pass]]
+after = 'read_strided 0 tc=int32 count=const(3) stride=const(8)'
+before = '''read_append 0 tc=int32
+skip 4
+read_append 0 tc=int32
+skip 4
+read_append 0 tc=int32'''
+level = 2
+matches = "a flat run of reads of the same element separated by one constant gap"
+must_not_fire = "the gap is zero or not constant, the reads differ in buffer or typecode, or the run does not end on a read"
+name = "strided_fusion"
+phase = "ir"
+rewrites = "one ReadStrided with the element count as an operand"
+tests = ["test_strided_fusion_over_a_flat_run", "test_strided_fusion_keeps_a_trailing_skip", "test_strided_fusion_leaves_a_different_element", "test_strided_fusion_leaves_a_zero_gap"]
+value = "high"
+
+[[pass]]
+after = 'buf_append_len dst=0 src=1'
+before = 'buf_append 0 = buffer_len(1)'
+level = 1
+matches = "an offsets buffer appended with the length of another buffer"
+must_not_fire = "the destination is not an OFFSETS buffer"
+name = "len_append_fusion"
+phase = "ir"
+rewrites = "BufferAppendLen, one instruction instead of a load and an append"
+tests = ["test_len_append_fusion", "test_len_append_fusion_needs_an_offsets_buffer"]
+value = "medium"
+
+[[pass]]
+after = 'buf_append_offset 0 = local(size)'
+before = 'buf_append 0 = binary(ADD, buffer_last(0), local(size))'
+level = 1
+matches = "an offsets buffer appended with the last element plus a delta"
+must_not_fire = "the buffer is not an OFFSETS buffer, or the addend is the buffer itself"
+name = "offset_fusion"
+phase = "ir"
+rewrites = "BufferAppendOffset"
+tests = ["test_offset_fusion"]
+value = "high"
+
+[[pass]]
+after = 'read_string chars=1 offsets=0 mode=1'
+before = '''assign local(size) = stream_read(uint8)
+if compare(CMP_EQ, local(size), const(255)):
+  assign local(size) = stream_read(uint32)
+buf_append_offset 0 = local(size)
+read_bulk 1 tc=uint8 count=local(size)'''
+level = 2
+matches = "a string length prefix, its bytes, and the offset it extends, in one body"
+must_not_fire = "the length local is read or written elsewhere, the buffers are not a byte buffer and an offsets buffer, or the escape guard is missing"
+name = "string_fusion"
+phase = "ir"
+rewrites = "one ReadString, which reads the prefix and the bytes in one dispatch"
+tests = ["test_string_fusion_of_a_sized_string", "test_string_fusion_of_a_headerless_string"]
+value = "high"
+
+[[pass]]
+after = 'skip 5'
+before = '''skip 2
+skip 3'''
+level = 1
+matches = "adjacent Skip and SkipVersion statements, or a zero-byte Skip"
+must_not_fire = "a jump targets the second statement"
+name = "skip_fusion"
+phase = "ir"
+rewrites = "one Skip covering both"
+tests = ["test_skip_fusion"]
+value = "medium"
+
+[[pass]]
+after = 'skip 4'
+before = 'assign local(dead) = stream_read(int32)'
+level = 1
+matches = "a StreamRead assigned to a local nothing reads"
+must_not_fire = "the read is fNBytes, a version, or a string, whose validation must still run"
+name = "dead_read_to_skip"
+phase = "ir"
+rewrites = "a Skip of the value's width"
+tests = ["test_dead_read_to_skip"]
+value = "medium"
+
+[[pass]]
+after = '''buf_append 0 = const(0)
+buf_append 0 = const(1)'''
+before = '''for i in range(const(0), const(2), step=1):
+  buf_append 0 = local(i)'''
+level = 2
+matches = "a ForRange with constant bounds and a small body"
+must_not_fire = "the body is large, the count is large, the body writes the loop variable, or the variable is read after the loop"
+name = "range_unroll"
+phase = "ir"
+rewrites = "the body repeated, with the loop variable folded to each value"
+tests = []
+value = "small"
+
+[[pass]]
+after = '<dropped, later functions renumbered>'
+before = 'function 3 name=unused.read arity=0 result=void'
+level = 2
+matches = "a function no call reaches from the entry point"
+must_not_fire = "every function is reachable"
+name = "dead_function"
+phase = "ir"
+rewrites = "the program without it, with function ids renumbered"
+tests = ["test_dead_function_drops_an_uncalled_function"]
+value = "high"
+
+[[pass]]
+after = 'read_append 0 tc=int32'
+before = '''call_stmt <none> = call(2, <none>)
+function 2 body: read_append 0 tc=int32; ret <none>'''
+level = 2
+matches = "a call to a straight-line callee with one call site in its caller"
+must_not_fire = "the callee has more than one call site in the same function, calls anything, is recursive, or is longer than six statements"
+name = "inline_small"
+phase = "ir"
+rewrites = "the callee's body at the call site"
+tests = []
+value = "high"
+
+[[pass]]
+after = 'jmp -> 20'
+before = 'jmp -> 12 (12: jmp -> 20)'
+level = 2
+matches = "a jump whose target is another jump"
+must_not_fire = "the jump would cross a function boundary"
+name = "jump_thread"
+phase = "ir"
+rewrites = "a jump to the final target"
+tests = []
+value = "small"
+
+[[pass]]
+after = 'ret <none>'
+before = '''ret <none>
+skip 4'''
+level = 1
+matches = "a statement after a Return or Throw in the same body"
+must_not_fire = "a label still targets the dropped region"
+name = "unreachable"
+phase = "ir"
+rewrites = "the body up to and including the terminator"
+tests = []
+value = "small"
+
+[[pass]]
+after = 'read_fields 0 count=local(n)'
+before = '''for i in range(const(0), local(n), step=1):
+  read_append 0 tc=int32
+  skip 2
+  read_append 1 tc=float64'''
+level = 2
+matches = "a run of at least two flat field steps, standalone or as the whole body of a counted loop"
+must_not_fire = "a field is conditional or variable-width, a bulk count is not constant, the run holds no value field, or the loop variable is read later"
+name = "layout_infer"
+phase = "ir"
+rewrites = "a ReadFields over an inferred layout, with the loop count as the object count"
+tests = ["test_layout_infer", "test_layout_infer_builds_skip_fields", "test_layout_infer_builds_a_fixed_array_field", "test_layout_infer_reads_a_counted_loop", "test_layout_infer_needs_a_constant_bulk_count"]
+value = "medium"
+
+[[pass]]
+after = '''buf_reserve 0 = const(4)
+for i in range(const(0), const(4), step=1):
+  buf_append 0 = local(i)'''
+before = '''for i in range(const(0), const(4), step=1):
+  buf_append 0 = local(i)'''
+level = 2
+matches = "a counted loop or a bulk, strided, or layout read that grows one buffer"
+must_not_fire = "the count is not known before the read, or more than one buffer grows"
+name = "reserve"
+phase = "ir"
+rewrites = "a BufferReserve before the loop or the read"
+tests = ["test_reserve_is_inserted_before_a_large_loop", "test_reserve_covers_a_strided_read"]
+value = "small"

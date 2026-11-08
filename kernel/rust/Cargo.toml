@@ -1,0 +1,15 @@
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "rustdetree"
+
+[package]
+description = "Rust implementation of the Detree machine."
+edition = "2021"
+license = "MIT"
+name = "detree-vm"
+publish = false
+rust-version = "1.75"
+version = "0.1.0"
+
+[profile.release]
+lto = "thin"

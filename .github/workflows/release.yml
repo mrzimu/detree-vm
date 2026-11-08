@@ -1,0 +1,194 @@
+name: Release
+
+# A tag is the only trigger: the wheel version comes from setuptools_scm, and a
+# release must be reproducible from the tagged commit (ADR 0009).
+on:
+  push:
+    tags: [v*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # The release build never sets DETREE_SHIP_BACKEND: the default is the Rust
+  # machine, and `both` would put the C++ library in the wheel, which
+  # tools/inspect_wheel.py rejects.
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  wheels:
+    name: wheel (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: manylinux-x86_64
+            runner: ubuntu-24.04
+            image: quay.io/pypa/manylinux_2_28_x86_64
+          - name: manylinux-aarch64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64
+          - name: macos-arm64
+            runner: macos-14
+          - name: windows-x64
+            runner: windows-2022
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      # The manylinux image is the only way to get a manylinux tag: a wheel
+      # built on the runner's glibc would repair to `linux_<arch>` and pip would
+      # never select it. `SETUPTOOLS_SCM_PRETEND_VERSION` removes the need for
+      # git inside the container.
+      - name: Build manylinux wheel
+        if: matrix.image
+        shell: bash
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e SETUPTOOLS_SCM_PRETEND_VERSION \
+            "${{ matrix.image }}" bash -lc '
+              set -euo pipefail
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+              . "$HOME/.cargo/env"
+              python=/opt/python/cp313-cp313/bin/python
+              "$python" -m pip install --quiet uv auditwheel
+              "$python" -m uv build --wheel --out-dir raw
+              "$python" -m auditwheel repair raw/*.whl -w dist
+            '
+
+      - name: Build native wheel
+        if: ${{ !matrix.image }}
+        shell: bash
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          uv build --wheel --out-dir dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.name }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    name: sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: uv build --sdist --out-dir dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  inspect:
+    name: inspect artifacts
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Check the wheel contract
+        run: python3 tools/inspect_wheel.py dist/*.whl
+      - name: Check the sdist carries the build sources
+        run: |
+          tar -tzf dist/*.tar.gz > sdist.txt
+          for path in kernel/cpp/CMakeLists.txt kernel/rust/src/lib.rs kernel/rust/Cargo.toml spec/isa.toml; do
+            grep -q "/$path$" sdist.txt || { echo "missing $path"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+
+  smoke:
+    name: smoke (${{ matrix.runner }})
+    needs: [wheels]
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, macos-14, windows-2022]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install and run the wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv venv /tmp/detree-release
+          if [ -f /tmp/detree-release/bin/python ]; then
+            python=/tmp/detree-release/bin/python
+          else
+            python=/tmp/detree-release/Scripts/python.exe
+          fi
+          # The local wheel is the only source for the new version; the index is
+          # allowed for numpy, which is a real dependency.
+          uv pip install --python "$python" --no-deps --find-links dist \
+            --prerelease=allow detree-vm
+          uv pip install --python "$python" numpy
+          "$python" -m detree backends
+          "$python" -c "import detree; assert detree.include_dir().joinpath('detree.h').is_file()"
+
+  testpypi:
+    name: publish to TestPyPI
+    needs: [inspect, smoke]
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    name: publish to PyPI
+    needs: [testpypi]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  notes:
+    name: release notes
+    needs: [pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

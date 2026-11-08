@@ -1,0 +1,1095 @@
+# Detree ISA v0.1 — machine-readable opcode table.
+#
+# This file is the single source of truth for opcode numbers, operand shapes,
+# register reads/writes, and instruction flags. `tools/gen_isa.py --check`
+# validates it against the Python, C++, and Rust tables and the Markdown mirror;
+# `--write` regenerates the operand table the disassembler reads. Do not edit
+# generated files by hand.
+#
+# Operand notation:
+# rd, ra, rb     register numbers (0..255)
+# IMM            signed 64-bit immediate in imm1
+# LBL            absolute instruction index in imm1
+# BUF            buffer id in imm1
+# SLOT           state slot id in imm1
+# FUNC           function id in imm1
+# LAYOUT         layout id in imm1
+# MSG            string id in imm1
+# CONST          string constant id in imm1
+# TC             typecode in imm1
+# ra, rb, LBL    the target is in imm2 for three-operand branches
+#
+# Flags:
+# terminator     ends a basic block
+# jump           unconditional control transfer
+# branch         conditional control transfer
+# call           inter-function call
+# stream         reads or moves the stream cursor
+# bulk           reads more than one element in one instruction
+# buffer         mutates or reads a buffer
+# state          mutates or reads a state slot
+# ref            mutates or reads the reference table
+# string         allocates or compares interned strings
+# verify         may raise an assertion or execution error
+# can_trap       may raise a runtime error (division by zero, bounds, ...)
+# pure           no side effects; may be removed when its result is dead
+# debug          debug-only; may be removed from a release module
+
+[buffer_kinds]
+COUNT = 2
+DATA = 0
+OFFSETS = 1
+
+[field_kinds]
+ARRAY_FIXED = 2
+SCALAR = 0
+SKIP = 1
+TOBJECT_SKIP = 3
+
+[meta]
+instruction_size = 20
+isa_major = 0
+isa_minor = 1
+magic = "DETR"
+
+[[op]]
+code = 0x00
+flags = ["terminator"]
+group = "control"
+name = "HALT"
+operands = ""
+reads = []
+summary = "Stop execution and return the output buffers."
+writes = []
+
+[[op]]
+code = 0x01
+flags = ["pure"]
+group = "control"
+name = "NOP"
+operands = ""
+reads = []
+summary = "No operation."
+writes = []
+
+[[op]]
+code = 0x02
+flags = ["debug", "pure"]
+group = "control"
+name = "LINE"
+operands = "IMM"
+reads = []
+summary = "Record a source line for diagnostics."
+writes = []
+
+[[op]]
+code = 0x03
+flags = ["debug"]
+group = "control"
+name = "DEBUG_PRINT"
+operands = "MSG, ra"
+reads = ["ra"]
+summary = "Print a debug message and a register value."
+writes = []
+
+[[op]]
+code = 0x04
+flags = ["pure"]
+group = "control"
+name = "CONST"
+operands = "rd, IMM"
+reads = []
+summary = "Load a signed 64-bit immediate."
+writes = ["rd"]
+
+[[op]]
+code = 0x05
+flags = ["pure"]
+group = "control"
+name = "CONST_F"
+operands = "rd, IMM"
+reads = []
+summary = "Load an IEEE-754 bit pattern (float bits in imm1)."
+writes = ["rd"]
+
+[[op]]
+code = 0x06
+flags = ["pure"]
+group = "control"
+name = "MOV"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Copy a register."
+writes = ["rd"]
+
+[[op]]
+code = 0x07
+flags = ["pure"]
+group = "control"
+name = "ZEXT32"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Zero-extend the low 32 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x08
+flags = ["pure"]
+group = "control"
+name = "ZEXT16"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Zero-extend the low 16 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x09
+flags = ["pure"]
+group = "control"
+name = "ZEXT8"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Zero-extend the low 8 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x0A
+flags = ["pure"]
+group = "control"
+name = "SEXT32"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Sign-extend the low 32 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x0B
+flags = ["pure"]
+group = "control"
+name = "SEXT16"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Sign-extend the low 16 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x0C
+flags = ["pure"]
+group = "control"
+name = "SEXT8"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Sign-extend the low 8 bits."
+writes = ["rd"]
+
+[[op]]
+code = 0x10
+flags = ["pure"]
+group = "arithmetic"
+name = "ADD"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Wrapping 64-bit addition."
+writes = ["rd"]
+
+[[op]]
+code = 0x11
+flags = ["pure"]
+group = "arithmetic"
+name = "SUB"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Wrapping 64-bit subtraction."
+writes = ["rd"]
+
+[[op]]
+code = 0x12
+flags = ["pure"]
+group = "arithmetic"
+name = "MUL"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Wrapping 64-bit multiplication."
+writes = ["rd"]
+
+[[op]]
+code = 0x13
+flags = ["can_trap"]
+group = "arithmetic"
+name = "DIV_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed division, truncated toward zero; division by zero traps."
+writes = ["rd"]
+
+[[op]]
+code = 0x14
+flags = ["can_trap"]
+group = "arithmetic"
+name = "DIV_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned division; division by zero traps."
+writes = ["rd"]
+
+[[op]]
+code = 0x15
+flags = ["can_trap"]
+group = "arithmetic"
+name = "MOD_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed remainder; division by zero traps."
+writes = ["rd"]
+
+[[op]]
+code = 0x16
+flags = ["can_trap"]
+group = "arithmetic"
+name = "MOD_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned remainder; division by zero traps."
+writes = ["rd"]
+
+[[op]]
+code = 0x17
+flags = ["pure"]
+group = "arithmetic"
+name = "NEG"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Two's-complement negation."
+writes = ["rd"]
+
+[[op]]
+code = 0x18
+flags = ["pure"]
+group = "arithmetic"
+name = "SHL"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Shift left; the shift amount is masked to 63."
+writes = ["rd"]
+
+[[op]]
+code = 0x19
+flags = ["pure"]
+group = "arithmetic"
+name = "SHR_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Arithmetic shift right; the shift amount is masked to 63."
+writes = ["rd"]
+
+[[op]]
+code = 0x1A
+flags = ["pure"]
+group = "arithmetic"
+name = "SHR_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Logical shift right; the shift amount is masked to 63."
+writes = ["rd"]
+
+[[op]]
+code = 0x1B
+flags = ["pure"]
+group = "arithmetic"
+name = "AND"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Bitwise AND."
+writes = ["rd"]
+
+[[op]]
+code = 0x1C
+flags = ["pure"]
+group = "arithmetic"
+name = "OR"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Bitwise OR."
+writes = ["rd"]
+
+[[op]]
+code = 0x1D
+flags = ["pure"]
+group = "arithmetic"
+name = "XOR"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Bitwise XOR."
+writes = ["rd"]
+
+[[op]]
+code = 0x1E
+flags = ["pure"]
+group = "arithmetic"
+name = "NOT"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Bitwise complement."
+writes = ["rd"]
+
+[[op]]
+code = 0x1F
+flags = ["pure"]
+group = "arithmetic"
+name = "NOT_B"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Logical not: 1 when ra is zero, 0 otherwise."
+writes = ["rd"]
+
+[[op]]
+code = 0x20
+flags = ["pure"]
+group = "compare"
+name = "CMP_EQ"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Equality."
+writes = ["rd"]
+
+[[op]]
+code = 0x21
+flags = ["pure"]
+group = "compare"
+name = "CMP_NE"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Inequality."
+writes = ["rd"]
+
+[[op]]
+code = 0x22
+flags = ["pure"]
+group = "compare"
+name = "CMP_LT_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed less-than."
+writes = ["rd"]
+
+[[op]]
+code = 0x23
+flags = ["pure"]
+group = "compare"
+name = "CMP_LE_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed less-or-equal."
+writes = ["rd"]
+
+[[op]]
+code = 0x24
+flags = ["pure"]
+group = "compare"
+name = "CMP_GT_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed greater-than."
+writes = ["rd"]
+
+[[op]]
+code = 0x25
+flags = ["pure"]
+group = "compare"
+name = "CMP_GE_S"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Signed greater-or-equal."
+writes = ["rd"]
+
+[[op]]
+code = 0x26
+flags = ["pure"]
+group = "compare"
+name = "CMP_LT_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned less-than."
+writes = ["rd"]
+
+[[op]]
+code = 0x27
+flags = ["pure"]
+group = "compare"
+name = "CMP_LE_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned less-or-equal."
+writes = ["rd"]
+
+[[op]]
+code = 0x28
+flags = ["pure"]
+group = "compare"
+name = "CMP_GT_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned greater-than."
+writes = ["rd"]
+
+[[op]]
+code = 0x29
+flags = ["pure"]
+group = "compare"
+name = "CMP_GE_U"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "Unsigned greater-or-equal."
+writes = ["rd"]
+
+[[op]]
+code = 0x30
+flags = ["jump", "terminator"]
+group = "flow"
+name = "JMP"
+operands = "LBL"
+reads = []
+summary = "Unconditional jump within the current function."
+writes = []
+
+[[op]]
+code = 0x31
+flags = ["branch", "terminator"]
+group = "flow"
+name = "JZ"
+operands = "ra, LBL"
+reads = ["ra"]
+summary = "Jump when ra is zero."
+writes = []
+
+[[op]]
+code = 0x32
+flags = ["branch", "terminator"]
+group = "flow"
+name = "JNZ"
+operands = "ra, LBL"
+reads = ["ra"]
+summary = "Jump when ra is nonzero."
+writes = []
+
+[[op]]
+code = 0x33
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_EQ"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump when ra == rb."
+writes = []
+
+[[op]]
+code = 0x34
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_NE"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump when ra != rb."
+writes = []
+
+[[op]]
+code = 0x35
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_LT_S"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on signed less-than."
+writes = []
+
+[[op]]
+code = 0x36
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_LE_S"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on signed less-or-equal."
+writes = []
+
+[[op]]
+code = 0x37
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_GT_S"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on signed greater-than."
+writes = []
+
+[[op]]
+code = 0x38
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_GE_S"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on signed greater-or-equal."
+writes = []
+
+[[op]]
+code = 0x39
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_LT_U"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on unsigned less-than."
+writes = []
+
+[[op]]
+code = 0x3A
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_LE_U"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on unsigned less-or-equal."
+writes = []
+
+[[op]]
+code = 0x3B
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_GT_U"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on unsigned greater-than."
+writes = []
+
+[[op]]
+code = 0x3C
+flags = ["branch", "terminator"]
+group = "flow"
+name = "BR_GE_U"
+operands = "ra, rb, LBL"
+reads = ["ra", "rb"]
+summary = "Jump on unsigned greater-or-equal."
+writes = []
+
+[[op]]
+code = 0x3D
+flags = ["call"]
+group = "flow"
+name = "CALL"
+operands = "rd, FUNC, ra"
+reads = ["ra"]
+summary = "Call a function with one argument and store its result."
+writes = ["rd"]
+
+[[op]]
+code = 0x3E
+flags = ["terminator"]
+group = "flow"
+name = "RET"
+operands = "ra"
+reads = ["ra"]
+summary = "Return a register to the caller."
+writes = []
+
+[[op]]
+code = 0x40
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SREAD"
+operands = "rd, TC"
+reads = []
+summary = "Read one big-endian scalar of type TC."
+writes = ["rd"]
+
+[[op]]
+code = 0x41
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SREAD_FNB"
+operands = "rd"
+reads = []
+summary = "Read a masked fNBytes length and return the masked value."
+writes = ["rd"]
+
+[[op]]
+code = 0x42
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SREAD_VERSION"
+operands = "rd"
+reads = []
+summary = "Read the int16 fVersion."
+writes = ["rd"]
+
+[[op]]
+code = 0x43
+flags = ["stream", "string", "can_trap"]
+group = "stream"
+name = "SREAD_CSTR"
+operands = "rd"
+reads = []
+summary = "Read a NUL-terminated string and return its arena id."
+writes = ["rd"]
+
+[[op]]
+code = 0x44
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP"
+operands = "IMM"
+reads = []
+summary = "Advance the cursor by a constant number of bytes."
+writes = []
+
+[[op]]
+code = 0x45
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_R"
+operands = "ra"
+reads = ["ra"]
+summary = "Advance the cursor by a register value."
+writes = []
+
+[[op]]
+code = 0x46
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_FNB"
+operands = ""
+reads = []
+summary = "Skip an fNBytes field, validating its byte-count mask."
+writes = []
+
+[[op]]
+code = 0x47
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_VERSION"
+operands = ""
+reads = []
+summary = "Skip the int16 fVersion."
+writes = []
+
+[[op]]
+code = 0x48
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_TOBJECT"
+operands = ""
+reads = []
+summary = "Skip a TObject header and its optional references."
+writes = []
+
+[[op]]
+code = 0x49
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_OBJHDR"
+operands = ""
+reads = []
+summary = "Skip an object header: fNBytes, tag, and class name when new."
+writes = []
+
+[[op]]
+code = 0x4A
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SKIP_CSTR"
+operands = ""
+reads = []
+summary = "Skip a NUL-terminated string."
+writes = []
+
+[[op]]
+code = 0x4B
+flags = ["pure"]
+group = "stream"
+name = "CURSOR"
+operands = "rd"
+reads = []
+summary = "Return the current stream cursor."
+writes = ["rd"]
+
+[[op]]
+code = 0x4C
+flags = ["stream", "can_trap"]
+group = "stream"
+name = "SET_CURSOR"
+operands = "ra"
+reads = ["ra"]
+summary = "Set the stream cursor, bounds-checked."
+writes = []
+
+[[op]]
+code = 0x4D
+flags = ["pure"]
+group = "stream"
+name = "ENTRIES"
+operands = "rd"
+reads = []
+summary = "Return the number of entries in the basket."
+writes = ["rd"]
+
+[[op]]
+code = 0x4E
+flags = ["pure"]
+group = "stream"
+name = "INIT_OFFSET"
+operands = "rd"
+reads = []
+summary = "Return the initial cursor position (the key length)."
+writes = ["rd"]
+
+[[op]]
+code = 0x4F
+flags = ["pure"]
+group = "stream"
+name = "DATA_SIZE"
+operands = "rd"
+reads = []
+summary = "Return the size of the current event's data."
+writes = ["rd"]
+
+[[op]]
+code = 0x60
+flags = ["pure"]
+group = "offsets"
+name = "OFFSET_AT"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Return entry_offsets[ra]."
+writes = ["rd"]
+
+[[op]]
+code = 0x61
+flags = ["pure"]
+group = "offsets"
+name = "OFFSET_SEEK"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Return the smallest entry offset strictly greater than ra."
+writes = ["rd"]
+
+[[op]]
+code = 0x62
+flags = ["pure"]
+group = "offsets"
+name = "EVENT_END"
+operands = "rd"
+reads = []
+summary = "Return entry_offsets[event + 1]."
+writes = ["rd"]
+
+[[op]]
+code = 0x70
+flags = ["stream", "buffer", "bulk", "can_trap"]
+group = "bulk"
+name = "READ_BULK"
+operands = "BUF, TC, ra"
+reads = ["ra"]
+summary = "Read ra consecutive elements into a buffer."
+writes = []
+
+[[op]]
+code = 0x71
+flags = ["stream", "buffer", "bulk", "can_trap"]
+group = "bulk"
+name = "READ_STRIDED"
+operands = "BUF, TC, ra, rb"
+reads = ["ra", "rb"]
+summary = "Read ra elements with a byte stride of rb into a buffer."
+writes = []
+
+[[op]]
+code = 0x72
+flags = ["stream", "buffer", "bulk", "can_trap"]
+group = "bulk"
+name = "READ_FIELDS"
+operands = "LAYOUT, ra"
+reads = ["ra"]
+summary = "Read ra flat objects of a layout into their buffers."
+writes = []
+
+[[op]]
+code = 0x73
+flags = ["stream", "buffer", "can_trap"]
+group = "bulk"
+name = "READ_APPEND"
+operands = "BUF, TC"
+reads = []
+summary = "Read one element and append it to a buffer."
+writes = []
+
+[[op]]
+code = 0x74
+flags = ["stream", "buffer", "bulk", "can_trap"]
+group = "bulk"
+name = "READ_BULK_UNTIL"
+operands = "BUF, TC, ra"
+reads = ["ra"]
+summary = "Read elements up to the ra byte offset, exactly."
+writes = []
+
+[[op]]
+code = 0x75
+flags = ["stream", "buffer", "can_trap"]
+group = "bulk"
+name = "READ_STRING"
+operands = "BUF, BUF"
+reads = []
+summary = "Read a length-prefixed string into a byte buffer and extend its offsets."
+writes = []
+
+[[op]]
+code = 0x80
+flags = ["buffer", "can_trap"]
+group = "buffer"
+name = "BUF_APPEND"
+operands = "BUF, ra"
+reads = ["ra"]
+summary = "Append a register value to a buffer."
+writes = []
+
+[[op]]
+code = 0x81
+flags = ["buffer", "can_trap"]
+group = "buffer"
+name = "BUF_APPEND_CONST"
+operands = "BUF, IMM"
+reads = []
+summary = "Append a constant to a buffer."
+writes = []
+
+[[op]]
+code = 0x82
+flags = ["buffer", "can_trap"]
+group = "buffer"
+name = "BUF_APPEND_OFFSET"
+operands = "BUF, ra"
+reads = ["ra"]
+summary = "Append buf[-1] + ra to an offsets buffer."
+writes = []
+
+[[op]]
+code = 0x83
+flags = ["buffer", "can_trap"]
+group = "buffer"
+name = "BUF_APPEND_LEN"
+operands = "BUF, BUF"
+reads = []
+summary = "Append len(src) to an offsets buffer."
+writes = []
+
+[[op]]
+code = 0x84
+flags = ["buffer", "pure"]
+group = "buffer"
+name = "BUF_LAST"
+operands = "rd, BUF"
+reads = []
+summary = "Read the last element of a buffer."
+writes = ["rd"]
+
+[[op]]
+code = 0x85
+flags = ["buffer", "pure"]
+group = "buffer"
+name = "BUF_LEN"
+operands = "rd, BUF"
+reads = []
+summary = "Read the element count of a buffer."
+writes = ["rd"]
+
+[[op]]
+code = 0x86
+flags = ["buffer"]
+group = "buffer"
+name = "BUF_RESERVE"
+operands = "BUF, ra"
+reads = ["ra"]
+summary = "Reserve capacity for ra more elements."
+writes = []
+
+[[op]]
+code = 0x90
+flags = ["state", "pure"]
+group = "state"
+name = "STATE_GET"
+operands = "rd, SLOT"
+reads = []
+summary = "Load a state slot."
+writes = ["rd"]
+
+[[op]]
+code = 0x91
+flags = ["state"]
+group = "state"
+name = "STATE_SET"
+operands = "SLOT, ra"
+reads = ["ra"]
+summary = "Store a register value in a state slot."
+writes = []
+
+[[op]]
+code = 0x92
+flags = ["state"]
+group = "state"
+name = "STATE_IADD"
+operands = "SLOT, IMM"
+reads = []
+summary = "Add an immediate to a state slot."
+writes = []
+
+[[op]]
+code = 0xA0
+flags = ["ref", "pure"]
+group = "ref"
+name = "REF_HAS"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "1 when the reference table contains the tag in ra."
+writes = ["rd"]
+
+[[op]]
+code = 0xA1
+flags = ["ref", "pure", "can_trap"]
+group = "ref"
+name = "REF_GET_OBJ"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Return the object index of a reference."
+writes = ["rd"]
+
+[[op]]
+code = 0xA2
+flags = ["ref", "pure"]
+group = "ref"
+name = "REF_GET_CLASS"
+operands = "rd, ra"
+reads = ["ra"]
+summary = "Return the class-name id of a reference, or -1."
+writes = ["rd"]
+
+[[op]]
+code = 0xA3
+flags = ["ref"]
+group = "ref"
+name = "REF_SET_OBJ"
+operands = "ra, rb"
+reads = ["ra", "rb"]
+summary = "Store an object reference."
+writes = []
+
+[[op]]
+code = 0xA4
+flags = ["ref"]
+group = "ref"
+name = "REF_SET_CLASS"
+operands = "ra, rb"
+reads = ["ra", "rb"]
+summary = "Store a class reference."
+writes = []
+
+[[op]]
+code = 0xA5
+flags = ["ref", "pure"]
+group = "ref"
+name = "REF_COUNT"
+operands = "rd"
+reads = []
+summary = "Return the number of reference entries."
+writes = ["rd"]
+
+[[op]]
+code = 0xB0
+flags = ["string", "pure"]
+group = "string"
+name = "STR_CONST"
+operands = "rd, CONST"
+reads = []
+summary = "Load an interned string constant id."
+writes = ["rd"]
+
+[[op]]
+code = 0xB1
+flags = ["string", "pure"]
+group = "string"
+name = "STR_EQ"
+operands = "rd, ra, rb"
+reads = ["ra", "rb"]
+summary = "String equality, 0 or 1."
+writes = ["rd"]
+
+[[op]]
+code = 0xB2
+flags = ["string", "state"]
+group = "string"
+name = "STR_STORE"
+operands = "SLOT, ra"
+reads = ["ra"]
+summary = "Store a string id in a name slot."
+writes = []
+
+[[op]]
+code = 0xB3
+flags = ["string", "state", "pure"]
+group = "string"
+name = "STR_LOAD"
+operands = "rd, SLOT"
+reads = []
+summary = "Load a string id from a name slot."
+writes = ["rd"]
+
+[[op]]
+code = 0xC0
+flags = ["verify", "can_trap"]
+group = "verify"
+name = "ASSERT"
+operands = "ra, MSG"
+reads = ["ra"]
+summary = "Fail unless ra is nonzero."
+writes = []
+
+[[op]]
+code = 0xC1
+flags = ["verify", "can_trap"]
+group = "verify"
+name = "ASSERT_CURSOR_EQ"
+operands = "ra, MSG"
+reads = ["ra"]
+summary = "Fail unless the cursor equals ra."
+writes = []
+
+[[op]]
+code = 0xC2
+flags = ["verify", "can_trap"]
+group = "verify"
+name = "ASSERT_STR_EQ"
+operands = "ra, rb, MSG"
+reads = ["ra", "rb"]
+summary = "Fail unless two string ids are equal."
+writes = []
+
+[[op]]
+code = 0xC3
+flags = ["verify", "terminator", "can_trap"]
+group = "verify"
+name = "THROW"
+operands = "MSG"
+reads = []
+summary = "Raise an unconditional decoder error."
+writes = []
+
+[typecodes]
+float32 = 9
+float64 = 10
+int16 = 6
+int32 = 7
+int64 = 8
+int8 = 5
+uint16 = 2
+uint32 = 3
+uint64 = 4
+uint8 = 1

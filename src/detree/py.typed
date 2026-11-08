@@ -1,0 +1,4 @@
+"""
+The `detree` package is fully annotated; this marker tells type checkers to
+read the inline annotations instead of treating the package as untyped.
+"""
