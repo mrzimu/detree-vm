@@ -58,9 +58,14 @@ def check(path: Path) -> list[str]:
         problems.append(f"{path.name}: a wheel with no platform has no machine")
 
     with zipfile.ZipFile(path) as wheel:
-        names = wheel.namelist()
+        members = wheel.infolist()
+        names = [member.filename for member in members]
 
-    libraries = [name for name in names if name.startswith("detree/_libs/")]
+    libraries = [
+        member.filename
+        for member in members
+        if member.filename.startswith("detree/_libs/") and not member.is_dir()
+    ]
     rust = [name for name in libraries if RUST_LIBRARY.match(name)]
     if len(libraries) != 1 or len(rust) != 1:
         problems.append(
