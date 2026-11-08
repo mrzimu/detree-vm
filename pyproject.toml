@@ -3,7 +3,7 @@ build-backend = "scikit_build_core.build"
 requires = ["scikit-build-core>=0.10", "setuptools-scm>=8"]
 
 [dependency-groups]
-dev = ["pytest", "pytest-subtests", "pre-commit"]
+dev = ["pytest", "pytest-subtests", "pre-commit", "tomli; python_version < '3.11'"]
 docs = [
   "furo",
   "myst-parser",
