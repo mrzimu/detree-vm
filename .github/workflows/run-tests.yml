@@ -35,7 +35,7 @@ jobs:
           enable-cache: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Install
-        run: uv pip install -e . --group dev
+        run: DETREE_SHIP_BACKEND=both uv pip install -e . --group dev
       - name: Pre-commit
         if: matrix.python-version == '3.13'
         run: uv run pre-commit run --all-files
