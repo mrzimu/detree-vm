@@ -47,6 +47,7 @@ pre-commit install
 | Optimizer consistency | `uv run python tools/gen_opt.py --check` |
 | Documentation checks | `uv run python tools/check_docs.py` |
 | Documentation site | `uv pip install --group docs` then `uv run sphinx-build -b html -c docs -d build/docs/doctrees -W docs build/docs/html` |
+| Documentation deploy | run the `deploy-docs` workflow; `release.yml` also calls it after PyPI |
 | Golden corpus | `uv run python tools/golden.py --check` |
 | Reduce a divergent case | `uv run python tools/golden.py --reduce tests/data/<case>.dtg` |
 | Wheel contract | `uv build` then `python3 tools/inspect_wheel.py dist/*.whl` |
@@ -98,7 +99,7 @@ Public wording follows the Rust-only rule from section 1. When a development-onl
 - The golden corpus is written by the Python reference build, never by the build under test. A module-format or compiler change re-records it in the same commit.
 - Every build replays the same corpus byte-for-byte, including expected errors and final states.
 - A new ABI field needs a layout test: `tools/abi_layout.c` versus the ctypes structures.
-- A green run with skipped backends is not a full conformance run. Check the skip summary, and say explicitly when a build is unavailable locally.
+- A green run with skipped backends is not a full conformance run. Check the skip summary, and say explicitly when a build is unavailable locally. The `conformance` job in `run-tests.yml` enforces this: it installs both machines, fails when `detree.abi.libs.library_path` cannot find `cpp` or `rust`, and calls `.venv/bin/python -m pytest` rather than `uv run pytest`, because `uv run` re-syncs the Rust-only default.
 
 ## 8. Adding an opcode
 

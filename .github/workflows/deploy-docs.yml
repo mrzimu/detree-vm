@@ -1,0 +1,55 @@
+name: deploy-docs
+
+# Two entries: a manual deploy from any branch, and the release workflow, which
+# calls this after PyPI so the published site always matches the tag. The site
+# is the same `-W` build the `run-tests` docs job runs, so a broken page fails a
+# pull request before it can fail a release.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A deploy in progress must not be cancelled: it would leave Pages serving a
+# half-uploaded site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+          activate-environment: true
+          enable-cache: true
+      # The documentation group carries Sphinx and the theme; the project itself
+      # is not installed because `docs/conf.py` imports from `src/`.
+      - name: Install the documentation toolchain
+        run: uv pip install --group docs
+      - name: Build the site
+        run: >-
+          .venv/bin/sphinx-build -b html -c docs -d build/docs/doctrees -W
+          docs build/docs/html
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/docs/html
+
+  deploy:
+    name: deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

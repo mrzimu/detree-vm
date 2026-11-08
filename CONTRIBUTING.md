@@ -62,6 +62,13 @@ The editable install builds the Rust cdylib. `uv.lock` is intentionally not comm
 - A run with skipped backends is not a full conformance run: build the C++ machine and install with `DETREE_SHIP_BACKEND=both` before claiming the matrix passes.
 - `uv run` re-syncs the editable install to the Rust-only default, so `[cpp]` cases skip afterwards; for the full matrix call `.venv/bin/python -m pytest` or `uv run --no-sync`.
 
+## Continuous integration
+
+- `run-tests.yml` runs on every pull request and on `main`: Python 3.9–3.14 against the Rust machine, plus a `conformance` job that installs with `DETREE_SHIP_BACKEND=both` and runs the suite three times (`python`, `cpp`, `rust`). That job fails when either compiled library is missing, so a skipped machine cannot pass as a green run.
+- `semantic-pr-titles.yml` checks the pull request title against the Conventional Commits types and runs on the pull request's title events.
+- `deploy-docs.yml` builds the site with `-W` and publishes it to GitHub Pages; run it by hand from the Actions tab, or let a release call it.
+- `release.yml` triggers on a `v*` tag, calls `run-tests.yml` as a gate before it builds anything, and deploys the documentation after PyPI accepts the upload.
+
 ## Commits and merge requests
 
 - Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`), and let the subject name the layer, for example `feat(opt): fuse length appends`. The merge request title follows the same rule; `.github/workflows/semantic-pr-titles.yml` rejects a title that does not.

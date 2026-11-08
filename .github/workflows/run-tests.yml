@@ -1,10 +1,13 @@
-name: CI
+name: run-tests
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # The release workflow calls this file so a tag is tested by exactly the CI
+  # that main runs, not by a second copy of the commands.
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -32,14 +35,14 @@ jobs:
           enable-cache: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Install
-        run: uv pip install -e . --group dev
+        run: DETREE_SHIP_BACKEND=both uv pip install -e . --group dev
       - name: Pre-commit
         if: matrix.python-version == '3.13'
         run: uv run pre-commit run --all-files
         env:
           SKIP: rustfmt
       - name: Tests
-        run: uv run pytest -q
+        run: uv run pytest -v
 
   cpp:
     runs-on: ubuntu-latest
@@ -89,6 +92,10 @@ jobs:
         run: cargo build --manifest-path kernel/rust/Cargo.toml --release
 
   conformance:
+    # Three machines, one suite. The install builds both compiled libraries and
+    # the tests are run through the venv directly: `uv run` re-syncs the
+    # editable install to the Rust-only default, after which the `[cpp]` cases
+    # skip instead of fail and a green run proves nothing.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -99,20 +106,36 @@ jobs:
           enable-cache: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Install both machines
-        run: DETREE_SHIP_BACKEND=both uv pip install -e . --group dev
+        run: >-
+          DETREE_SHIP_BACKEND=both uv pip install -e . --group dev
+          --reinstall-package detree-vm
+      - name: Both libraries are installed
+        # A skipped backend is not a passing backend, so fail here rather than
+        # read a green suite that only ran the Python reference.
+        run: >-
+          .venv/bin/python -c "import sys; from detree.abi.libs import library_path;
+          missing = [n for n in ('cpp', 'rust') if library_path(n) is None];
+          sys.exit(f'missing compiled machine: {missing}' if missing else 0)"
       - name: Backend identity
-        run: uv run pytest -q tests/test_backends.py
+        run: .venv/bin/python -m pytest -q tests/test_backends.py
       - name: Python reference
-        run: DETREE_BACKEND=python uv run pytest -q
+        run: DETREE_BACKEND=python .venv/bin/python -m pytest -q -rs
       - name: C++ machine
-        run: DETREE_BACKEND=cpp uv run pytest -q
+        run: DETREE_BACKEND=cpp .venv/bin/python -m pytest -q -rs
       - name: Rust machine
-        run: DETREE_BACKEND=rust uv run pytest -q
+        run: DETREE_BACKEND=rust .venv/bin/python -m pytest -q -rs
 
   docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.13'
+          activate-environment: true
+          enable-cache: true
+      - name: Install the documentation toolchain
+        run: uv pip install --group docs
       - name: ISA tables
         run: python3 tools/gen_isa.py --check
       - name: Optimizer document
@@ -121,11 +144,22 @@ jobs:
         run: python3 tools/check_docs.py
       - name: Golden corpus
         run: python3 tools/golden.py --check
+      # The deploy workflow publishes this build, so a broken page has to fail
+      # the pull request instead of the release. `-W` is the same flag.
+      - name: Build the site
+        run: >-
+          .venv/bin/sphinx-build -b html -c docs -d build/docs/doctrees -W
+          docs build/docs/html
 
   package:
     # The release artifact is part of the product: build it on every change and
     # check the wheel contract (one Rust library, the C header, a py3-none tag)
     # before a tag ever exists.
+    #
+    # Skipped on a tag: `release.yml` builds the four artifacts it publishes and
+    # its `inspect` job runs the same contract checks, so a wheel built here
+    # would never be shipped and would only repeat the work.
+    if: github.ref_type != 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
