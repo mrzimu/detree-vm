@@ -64,7 +64,7 @@ The editable install builds the Rust cdylib. `uv.lock` is intentionally not comm
 
 ## Commits and merge requests
 
-- Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`), and let the subject name the layer, for example `feat(opt): fuse length appends`.
+- Use Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`), and let the subject name the layer, for example `feat(opt): fuse length appends`. The merge request title follows the same rule; `.github/workflows/semantic-pr-titles.yml` rejects a title that does not.
 - Keep a change small and verifiable, and say which checks ran and which backends were unavailable locally.
 - A change to `spec/isa.toml` or `docs/spec/module.md` names the ISA version bump in the description.
 
