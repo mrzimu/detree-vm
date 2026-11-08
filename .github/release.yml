@@ -11,7 +11,7 @@ changelog:
         - performance
     - title: Bug Fixes
       labels:
-        - bug fix
+        - bug-fix
     - title: Documentation, Tests, and CI
       labels:
         - documentation
