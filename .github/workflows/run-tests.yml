@@ -155,6 +155,11 @@ jobs:
     # The release artifact is part of the product: build it on every change and
     # check the wheel contract (one Rust library, the C header, a py3-none tag)
     # before a tag ever exists.
+    #
+    # Skipped on a tag: `release.yml` builds the four artifacts it publishes and
+    # its `inspect` job runs the same contract checks, so a wheel built here
+    # would never be shipped and would only repeat the work.
+    if: github.ref_type != 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
