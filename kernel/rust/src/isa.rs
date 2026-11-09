@@ -465,7 +465,6 @@ impl Typecode {
 pub enum BufferKind {
     Data = 0,
     Offsets = 1,
-    Count = 2,
 }
 
 impl BufferKind {
@@ -474,7 +473,6 @@ impl BufferKind {
         Some(match value {
             0 => BufferKind::Data,
             1 => BufferKind::Offsets,
-            2 => BufferKind::Count,
             _ => return None,
         })
     }
@@ -545,4 +543,12 @@ pub fn buffer_typecode(dtype: &str) -> Option<Typecode> {
         "float64" => Typecode::Float64,
         _ => return None,
     })
+}
+
+/// True when `dtype` names a buffer dtype that holds integers.
+///
+/// `bool` decodes to `Uint8` like a byte does, so it is excluded by name: a
+/// structural buffer cannot carry offsets or counters in one bit.
+pub fn is_integer_dtype(dtype: &str) -> bool {
+    matches!(buffer_typecode(dtype), Some(code) if !code.is_float()) && dtype != "bool"
 }

@@ -8,8 +8,8 @@ use std::collections::HashSet;
 
 use crate::errors::{Error, Result};
 use crate::isa::{
-    buffer_typecode, BufferKind, FieldKind, Ins, Op, Typecode, INSTRUCTION_SIZE, ISA_MAJOR,
-    ISA_MINOR, MAGIC,
+    buffer_typecode, is_integer_dtype, BufferKind, FieldKind, Ins, Op, Typecode, INSTRUCTION_SIZE,
+    ISA_MAJOR, ISA_MINOR, MAGIC,
 };
 
 /// One declared output buffer.
@@ -386,9 +386,9 @@ pub fn validate(module: &Module) -> Result<()> {
                 decl.dtype
             )));
         }
-        if decl.kind != BufferKind::Data && decl.dtype != "int64" {
+        if decl.kind != BufferKind::Data && !is_integer_dtype(&decl.dtype) {
             return Err(Error::module(format!(
-                "buffer {name}: OFFSETS/COUNT buffers must be int64"
+                "buffer {name}: OFFSETS/COUNT buffers must be an integer dtype"
             )));
         }
     }

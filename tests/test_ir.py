@@ -20,7 +20,7 @@ from detree.ir import (
     verify_program,
 )
 from detree.ir.errors import IRValidationError
-from detree.spec.isa import Op, Typecode
+from detree.spec.isa import BufferKind, Op, Typecode
 
 
 def sample():
@@ -128,6 +128,36 @@ def test_verify_rejects_a_bad_buffer_reference():
     func.ret()
 
     with pytest.raises(IRValidationError, match="buffer"):
+        verify_program(builder.build())
+
+
+def test_verify_accepts_a_narrow_offsets_buffer():
+    builder = ProgramBuilder()
+    offsets = builder.buffer("offsets", "int16", kind=BufferKind.OFFSETS, init=(0,))
+    func = builder.function("read")
+    func.emit(nodes.BufferAppendOffset(offsets, Const(4)))
+    func.ret()
+
+    verify_program(builder.build())
+
+
+def test_verify_rejects_a_float_structural_buffer():
+    builder = ProgramBuilder()
+    builder.buffer("offsets", "float64", kind=BufferKind.OFFSETS)
+    func = builder.function("read")
+    func.ret()
+
+    with pytest.raises(IRValidationError, match="integer"):
+        verify_program(builder.build())
+
+
+def test_verify_rejects_a_bool_offsets_buffer():
+    builder = ProgramBuilder()
+    builder.buffer("offsets", "bool", kind=BufferKind.OFFSETS)
+    func = builder.function("read")
+    func.ret()
+
+    with pytest.raises(IRValidationError, match="integer"):
         verify_program(builder.build())
 
 

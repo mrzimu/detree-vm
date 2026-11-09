@@ -36,7 +36,6 @@
 # debug          debug-only; may be removed from a release module
 
 [buffer_kinds]
-COUNT = 2
 DATA = 0
 OFFSETS = 1
 

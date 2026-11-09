@@ -35,7 +35,7 @@ offset 0     magic         4 bytes, "DETR"
 
 buffers[]    text name              structural path, e.g. "root/items:offsets"
              text dtype             one of the buffer dtypes below
-             u8   kind              0 DATA, 1 OFFSETS, 2 COUNT
+             u8   kind              0 DATA, 1 OFFSETS
              u32  n_init
              i64  init[n_init]      seeds the buffer before the first event
 
@@ -81,10 +81,11 @@ float32 float64
 | Kind | Value | Meaning |
 |---|---|---|
 | `DATA` | 0 | element storage |
-| `OFFSETS` | 1 | int64 offsets; initialised with a single `0` |
-| `COUNT` | 2 | int64 counters |
+| `OFFSETS` | 1 | integer offsets; initialised with a single `0` |
 
-An `OFFSETS` buffer MUST be declared with dtype `int64`. A `COUNT` buffer MUST be declared with dtype `int64`. A `DATA` buffer may use any dtype.
+An `OFFSETS` buffer MUST be declared with an integer dtype: `uint8`, `uint16`, `uint32`, `uint64`, `int8`, `int16`, `int32`, or `int64`; `bool` and the two float dtypes are not offsets. A `DATA` buffer may use any dtype.
+
+A machine does not check that an appended value fits the declared width: an `OFFSETS` buffer narrower than 64 bits wraps once the basket it describes grows past its range, so a frontend that cannot bound the basket size declares `int64`.
 
 `init` seeds the buffer before the first event. An offsets buffer normally has `init = (0,)`, which makes `BUF_APPEND_OFFSET` a one-instruction update.
 

@@ -173,7 +173,6 @@ class BufferKind(IntEnum):
 
     DATA = 0
     OFFSETS = 1
-    COUNT = 2
 
 
 @unique
@@ -244,6 +243,11 @@ DTYPE_TO_TYPECODE = {
 
 # Every dtype a buffer may be declared with.
 BUFFER_DTYPES = frozenset(DTYPE_TO_TYPECODE)
+
+# Buffer dtypes that hold integers. A structural buffer needs an integer element,
+# so `bool` and the two float bit patterns are excluded even though they are
+# valid buffer dtypes.
+INT_BUFFER_DTYPES = BUFFER_DTYPES - {"bool", "float32", "float64"}
 
 # Instructions whose `imm1` is an absolute instruction index.
 JUMP_OPS = frozenset(
@@ -411,6 +415,7 @@ __all__ = [
     "FLOAT_TYPECODES",
     "FieldKind",
     "INS_SIZE",
+    "INT_BUFFER_DTYPES",
     "ISA_MAJOR",
     "ISA_MINOR",
     "JUMP_OPS",
