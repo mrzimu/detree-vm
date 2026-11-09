@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from ..spec.isa import (
     BUFFER_DTYPES,
+    INT_BUFFER_DTYPES,
     BufferKind,
     FieldKind,
     Op,
@@ -576,11 +577,11 @@ def verify_program(program: nodes.Program) -> None:
         buffer_names.add(buffer.name)
         if buffer.dtype not in BUFFER_DTYPES:
             raise IRValidationError(f"buffer {buffer.name!r}: dtype {buffer.dtype!r}")
-        if buffer.kind not in (BufferKind.DATA, BufferKind.OFFSETS, BufferKind.COUNT):
+        if buffer.kind not in (BufferKind.DATA, BufferKind.OFFSETS):
             raise IRValidationError(f"buffer {buffer.name!r}: kind {buffer.kind}")
-        if buffer.kind in (BufferKind.OFFSETS, BufferKind.COUNT) and buffer.dtype != "int64":
+        if buffer.kind != BufferKind.DATA and buffer.dtype not in INT_BUFFER_DTYPES:
             raise IRValidationError(
-                f"buffer {buffer.name!r}: {buffer.kind.name} must be int64"
+                f"buffer {buffer.name!r}: {buffer.kind.name} must be an integer dtype"
             )
 
     state_names = set()

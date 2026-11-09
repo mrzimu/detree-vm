@@ -141,6 +141,13 @@ namespace detree {
         return buffer_typecode( dtype, tc );
     }
 
+    bool is_integer_buffer_dtype( std::string_view dtype ) noexcept {
+        if ( dtype == "bool" ) { return false; }
+        Typecode tc;
+        if ( !buffer_typecode( dtype, tc ) ) { return false; }
+        return tc != Typecode::FLOAT32 && tc != Typecode::FLOAT64;
+    }
+
     bool is_known_op( Op op ) noexcept {
         for ( const auto& entry : kOpNames )
         {

@@ -147,7 +147,6 @@ namespace detree {
     enum class BufferKind : std::uint8_t {
         DATA    = 0,
         OFFSETS = 1,
-        COUNT   = 2,
     };
 
     /// How one field of a flat layout is read.
@@ -291,6 +290,9 @@ namespace detree {
 
     /// True when @p dtype names a buffer dtype this machine knows.
     bool is_known_buffer_dtype( std::string_view dtype ) noexcept;
+
+    /// True when @p dtype names a buffer dtype that holds integers.
+    bool is_integer_buffer_dtype( std::string_view dtype ) noexcept;
 
     /// True when @p op is an opcode of this ISA version.
     bool is_known_op( Op op ) noexcept;

@@ -13,6 +13,7 @@ from .errors import ModuleValidationError
 from .isa import (
     BUFFER_DTYPES,
     BUFFER_OPS,
+    INT_BUFFER_DTYPES,
     ISA_MAJOR,
     ISA_MINOR,
     JUMP_OPS,
@@ -253,11 +254,11 @@ def _validate_buffers(module: Module) -> None:
         names.add(decl.name)
         if decl.dtype not in BUFFER_DTYPES:
             raise ModuleValidationError(f"buffer {decl.name}: dtype {decl.dtype!r}")
-        if decl.kind not in (BufferKind.DATA, BufferKind.OFFSETS, BufferKind.COUNT):
+        if decl.kind not in (BufferKind.DATA, BufferKind.OFFSETS):
             raise ModuleValidationError(f"buffer {decl.name}: kind {decl.kind}")
-        if decl.kind in (BufferKind.OFFSETS, BufferKind.COUNT) and decl.dtype != "int64":
+        if decl.kind != BufferKind.DATA and decl.dtype not in INT_BUFFER_DTYPES:
             raise ModuleValidationError(
-                f"buffer {decl.name}: {decl.kind.name} buffers must be int64"
+                f"buffer {decl.name}: {decl.kind.name} buffers must be an integer dtype"
             )
 
 

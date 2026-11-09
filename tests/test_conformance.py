@@ -144,13 +144,11 @@ def test_buffer_kinds_are_declared(machine_factory):
     builder = Builder()
     data = builder.buffer("data", "int32")
     offsets = builder.buffer("offsets", "int64", kind=BufferKind.OFFSETS)
-    count = builder.buffer("count", "int64", kind=BufferKind.COUNT)
     builder.function(
         "read",
         [
             ins(Op.BUF_APPEND_CONST, imm1=data, imm2=1),
             ins(Op.BUF_APPEND_CONST, imm1=offsets, imm2=2),
-            ins(Op.BUF_APPEND_CONST, imm1=count, imm2=3),
             ins(Op.RET, ra=0),
         ],
     )
@@ -158,7 +156,86 @@ def test_buffer_kinds_are_declared(machine_factory):
     outputs, _, _ = run(machine_factory, builder, b"")
     assert outputs["data"].tolist() == [1]
     assert outputs["offsets"].tolist() == [2]
-    assert outputs["count"].tolist() == [3]
+
+
+def _value_from_bits(dtype, bits):
+    """The value a buffer of *dtype* reports after appending *bits*."""
+    if dtype == "bool":
+        return True
+    if dtype == "float32":
+        return struct.unpack("<f", struct.pack("<I", bits))[0]
+    if dtype == "float64":
+        return struct.unpack("<d", struct.pack("<Q", bits))[0]
+    return bits
+
+
+_BUFFER_DTYPES = [
+    "bool",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "float32",
+    "float64",
+]
+_INT_DTYPES = [name for name in _BUFFER_DTYPES if name not in ("bool", "float32", "float64")]
+
+
+@pytest.mark.parametrize(
+    "kind,dtype",
+    [(BufferKind.DATA, name) for name in _BUFFER_DTYPES]
+    + [(BufferKind.OFFSETS, name) for name in _INT_DTYPES],
+)
+def test_every_buffer_dtype_takes_its_kind(machine_factory, kind, dtype):
+    builder = Builder()
+    out = builder.buffer("out", dtype, kind=kind)
+    builder.function(
+        "read",
+        [
+            ins(Op.BUF_APPEND_CONST, imm1=out, imm2=3),
+            ins(Op.RET, ra=0),
+        ],
+    )
+
+    outputs, _, _ = run(machine_factory, builder, b"")
+
+    assert outputs["out"].dtype.name == dtype
+    assert outputs["out"].tolist() == [_value_from_bits(dtype, 3)]
+
+
+def test_narrow_offsets_buffer(machine_factory):
+    builder = Builder()
+    offsets = builder.buffer("offsets", "int16", kind=BufferKind.OFFSETS, init=(0,))
+    lens = builder.buffer("lens", "int32")
+    data = builder.buffer("data", "int32")
+    builder.function(
+        "read",
+        [
+            ins(Op.CONST, rd=0, imm1=300),
+            ins(Op.BUF_APPEND_OFFSET, imm1=offsets, ra=0),
+            ins(Op.BUF_APPEND_OFFSET, imm1=offsets, ra=0),
+            ins(Op.CONST, rd=1, imm1=40000),
+            ins(Op.BUF_APPEND_OFFSET, imm1=offsets, ra=1),
+            ins(Op.BUF_LAST, rd=2, imm1=offsets),
+            ins(Op.BUF_APPEND, imm1=data, ra=2),
+            ins(Op.BUF_APPEND_CONST, imm1=lens, imm2=7),
+            ins(Op.BUF_LEN, rd=3, imm1=offsets),
+            ins(Op.BUF_APPEND, imm1=lens, ra=3),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=4,
+    )
+
+    outputs, _, _ = run(machine_factory, builder, b"")
+
+    # 600 + 40000 does not fit int16, and every machine wraps it the same way.
+    assert outputs["offsets"].tolist() == [0, 300, 600, -24936]
+    assert outputs["data"].tolist() == [-24936]
+    assert outputs["lens"].tolist() == [7, 4]
 
 
 # ---------------------------------------------------------------------------

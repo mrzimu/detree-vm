@@ -447,15 +447,15 @@ namespace detree {
             if ( !is_known_buffer_dtype( decl.dtype ) )
             { throw ModuleError( "buffer " + name + ": dtype '" + decl.dtype + "'" ); }
             if ( static_cast<std::uint8_t>( decl.kind ) >
-                 static_cast<std::uint8_t>( BufferKind::COUNT ) )
+                 static_cast<std::uint8_t>( BufferKind::OFFSETS ) )
             {
                 throw ModuleError( "buffer " + name + ": kind " +
                                    std::to_string( static_cast<int>( decl.kind ) ) );
             }
-            if ( decl.kind != BufferKind::DATA && decl.dtype != "int64" )
+            if ( decl.kind != BufferKind::DATA && !is_integer_buffer_dtype( decl.dtype ) )
             {
                 throw ModuleError( "buffer " + name +
-                                   ": OFFSETS/COUNT buffers must be int64" );
+                                   ": OFFSETS/COUNT buffers must be an integer dtype" );
             }
         }
 

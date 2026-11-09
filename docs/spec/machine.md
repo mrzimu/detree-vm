@@ -36,8 +36,7 @@ The compiler knows the static type of every expression. The machine does not nee
 A buffer is append-only during a run. It has a declared dtype, a kind, and an initial sequence.
 
 - `DATA` holds elements.
-- `OFFSETS` holds int64 offsets and starts with a single `0`.
-- `COUNT` holds int64 counters.
+- `OFFSETS` holds integer offsets and normally starts with a single `0`.
 
 After a run, each buffer is exposed as a one-dimensional array of its declared dtype. The machine adopts a representation that can be viewed without copying where the language binding allows it; the Python binding uses NumPy views over the machine's storage.
 

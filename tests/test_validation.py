@@ -42,9 +42,16 @@ def test_duplicate_buffer_names(machine_factory):
     rejects(machine_factory, builder)
 
 
-def test_offsets_buffer_must_be_int64(machine_factory):
+def test_offsets_buffer_rejects_a_float_dtype(machine_factory):
     builder = Builder()
-    builder.buffer("offsets", "int32", kind=BufferKind.OFFSETS)
+    builder.buffer("offsets", "float64", kind=BufferKind.OFFSETS)
+    builder.function("read", [ins(Op.RET, ra=0)])
+    rejects(machine_factory, builder)
+
+
+def test_offsets_buffer_rejects_bool(machine_factory):
+    builder = Builder()
+    builder.buffer("offsets", "bool", kind=BufferKind.OFFSETS)
     builder.function("read", [ins(Op.RET, ra=0)])
     rejects(machine_factory, builder)
 
