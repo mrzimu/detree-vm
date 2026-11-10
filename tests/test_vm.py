@@ -158,9 +158,7 @@ def test_byte_count_mismatch_names_both_positions():
 def test_byte_count_end_without_begin_is_an_error():
     builder = Builder()
     message = builder.string("orphan frame")
-    builder.function(
-        "read", [ins(Op.FNB_END, imm1=message), ins(Op.RET, ra=0)], reg_count=1
-    )
+    builder.function("read", [ins(Op.FNB_END, imm1=message), ins(Op.RET, ra=0)], reg_count=1)
     machine = PythonMachine(builder.build().to_bytes())
 
     with pytest.raises(DetreeError, match="no open byte-count frame"):

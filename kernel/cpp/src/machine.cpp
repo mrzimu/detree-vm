@@ -186,8 +186,9 @@ namespace detree {
     void Machine::require_nb_depth( std::size_t expected ) {
         if ( m_nb_stack.size() != expected )
         {
-            fail<Error>( "return with byte-count depth " + std::to_string( m_nb_stack.size() ) +
-                         ", expected " + std::to_string( expected ) );
+            fail<Error>( "return with byte-count depth " +
+                         std::to_string( m_nb_stack.size() ) + ", expected " +
+                         std::to_string( expected ) );
         }
     }
 
@@ -369,9 +370,9 @@ namespace detree {
             const std::uint64_t argument = ins.ra < m_reg_count ? reg( ins.ra ) : 0;
 
             Frame frame;
-            frame.func = m_func_index;
-            frame.ip   = m_ip;
-            frame.dst  = ins.rd;
+            frame.func     = m_func_index;
+            frame.ip       = m_ip;
+            frame.dst      = ins.rd;
             frame.nb_depth = m_nb_stack.size();
             m_frames.push_back( frame );
 
@@ -472,9 +473,7 @@ namespace detree {
                                         " lacks kByteCountMask" );
             }
             if ( m_nb_stack.size() >= kMaxDepth )
-            {
-                fail<StackOverflow>( "byte-count depth above " + std::to_string( kMaxDepth ) );
-            }
+            { fail<StackOverflow>( "byte-count depth above " + std::to_string( kMaxDepth ) ); }
             m_nb_stack.push_back( static_cast<std::uint64_t>( m_cursor ) +
                                   ( value & ~static_cast<std::uint64_t>( 0x40000000 ) ) );
             return;
