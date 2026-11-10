@@ -63,5 +63,5 @@ def test_compiled_backend_identity(name):
     assert library.detree_backend_name().decode() == name
     assert library.detree_c_api_version() == 1
     assert library.detree_isa_major() == 0
-    assert library.detree_isa_minor() == 1
+    assert library.detree_isa_minor() == 2
     assert isinstance(library.detree_capabilities(), int)

@@ -9,7 +9,7 @@ from module_builder import Builder, ins
 
 from detree.abi.libs import compiled_backends, include_dir, library_path
 from detree.cli import main
-from detree.spec.isa import Op, Typecode
+from detree.spec.isa import ISA_MAJOR, ISA_MINOR, Op, Typecode
 
 
 def one_module() -> bytes:
@@ -66,7 +66,7 @@ def test_disasm_prints_tables_and_code(tmp_path, capsys):
     assert main(["disasm", str(path)]) == 0
 
     output = capsys.readouterr().out
-    assert "module  isa=0.1" in output
+    assert f"module  isa={ISA_MAJOR}.{ISA_MINOR}" in output
     assert "out" in output
     assert "int32" in output
     assert "SREAD" in output

@@ -78,6 +78,8 @@ OPERANDS = {
     "ENTRIES": ("rd",),
     "INIT_OFFSET": ("rd",),
     "DATA_SIZE": ("rd",),
+    "FNB_BEGIN": (),
+    "FNB_END": ("imm1",),
     "OFFSET_AT": ("rd", "ra"),
     "OFFSET_SEEK": ("rd", "ra"),
     "EVENT_END": ("rd",),

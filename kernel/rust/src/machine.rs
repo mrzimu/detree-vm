@@ -66,6 +66,8 @@ struct Frame {
     func: usize,
     ip: usize,
     dst: u8,
+    /// Byte-count stack depth the callee must hand back on `RET`.
+    nb_depth: usize,
 }
 
 /// A state slot as the Python machine reports it.
@@ -95,6 +97,8 @@ pub struct Machine {
     func_index: usize,
     ip: usize,
     halted: bool,
+    /// End positions of the open `FNB_BEGIN` regions, innermost last.
+    nb_stack: Vec<u64>,
 
     reg_pool: Vec<u64>,
     max_regs: usize,
@@ -135,6 +139,7 @@ impl Machine {
             func_index: module.entry as usize,
             ip: 0,
             halted: true,
+            nb_stack: Vec::new(),
             reg_pool: vec![0; (MAX_DEPTH + 1) * max_regs],
             max_regs,
             reg_count: 0,
@@ -162,6 +167,7 @@ impl Machine {
         self.event = 0;
         self.entry_end = 0;
         self.frames.clear();
+        self.nb_stack.clear();
         self.depth = 0;
         self.func_index = self.module.entry as usize;
         self.ip = 0;
@@ -232,6 +238,7 @@ impl Machine {
             // SAFETY: the offsets outlive `run` and `event + 1 < n_offsets`.
             self.entry_end = unsafe { *self.offsets.add(event + 1) } as usize;
             self.frames.clear();
+            self.nb_stack.clear();
             self.depth = 0;
             self.func_index = entry_index;
             self.reg_count = reg_count;
@@ -320,6 +327,20 @@ impl Machine {
                 format!(
                     "need {nbytes} bytes, {} left",
                     self.data_len.saturating_sub(self.cursor)
+                ),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Fail when a return hands back a different byte-count depth.
+    fn require_nb_depth(&self, expected: usize) -> Result<()> {
+        if self.nb_stack.len() != expected {
+            return Err(self.err(
+                Kind::Other,
+                format!(
+                    "return with byte-count depth {}, expected {expected}",
+                    self.nb_stack.len()
                 ),
             ));
         }
@@ -633,6 +654,7 @@ impl Machine {
                     func: self.func_index,
                     ip: self.ip,
                     dst: ins.rd,
+                    nb_depth: self.nb_stack.len(),
                 });
                 self.depth += 1;
                 let callee = &self.module.funcs[callee_id];
@@ -656,6 +678,7 @@ impl Machine {
                     0
                 };
                 if let Some(frame) = self.frames.pop() {
+                    self.require_nb_depth(frame.nb_depth)?;
                     self.depth -= 1;
                     self.func_index = frame.func;
                     self.ip = frame.ip;
@@ -665,6 +688,7 @@ impl Machine {
                     self.code_len = caller.code_len as usize;
                     self.set_reg(frame.dst, value);
                 } else {
+                    self.require_nb_depth(0)?;
                     self.halted = true;
                 }
             }
@@ -719,6 +743,38 @@ impl Machine {
                     return Err(self.err(
                         Kind::InvalidByteCount,
                         format!("fNBytes={value} lacks kByteCountMask"),
+                    ));
+                }
+            }
+            Op::FnbBegin => {
+                let value = self.read_bits(4)?;
+                if value & BYTE_COUNT_MASK == 0 {
+                    return Err(self.err(
+                        Kind::InvalidByteCount,
+                        format!("fNBytes={value} lacks kByteCountMask"),
+                    ));
+                }
+                if self.nb_stack.len() >= MAX_DEPTH {
+                    return Err(self.err(
+                        Kind::StackOverflow,
+                        format!("byte-count depth above {MAX_DEPTH}"),
+                    ));
+                }
+                let end = self.cursor as u64 + (value & !BYTE_COUNT_MASK);
+                self.nb_stack.push(end);
+            }
+            Op::FnbEnd => {
+                let Some(expected) = self.nb_stack.pop() else {
+                    return Err(self.err(Kind::Other, "FNB_END with no open byte-count frame"));
+                };
+                if self.cursor as u64 != expected {
+                    return Err(self.err(
+                        Kind::AssertionFailed,
+                        format!(
+                            "{} (expected {expected}, got {})",
+                            self.message_of(ins.imm1),
+                            self.cursor
+                        ),
                     ));
                 }
             }

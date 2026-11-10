@@ -26,7 +26,7 @@ fn halt_module() -> Vec<u8> {
     let mut out = Vec::new();
     out.extend_from_slice(b"DETR");
     put16(&mut out, 0); // isa_major
-    put16(&mut out, 1); // isa_minor
+    put16(&mut out, 2); // isa_minor
     put16(&mut out, 0); // entry
     put16(&mut out, 0); // regs_max
     put32(&mut out, 0); // buffers
@@ -57,7 +57,7 @@ fn halt_module() -> Vec<u8> {
 fn c_api_reports_identity() {
     assert_eq!(detree_c_api_version(), 1);
     assert_eq!(detree_isa_major(), 0);
-    assert_eq!(detree_isa_minor(), 1);
+    assert_eq!(detree_isa_minor(), 2);
     assert_eq!(detree_capabilities(), 0x1F);
 
     // SAFETY: the pointers come from static NUL-terminated byte strings.

@@ -109,7 +109,7 @@ Public wording follows the Rust-only rule from section 1. When a development-onl
 4. Implement the opcode in the Python reference machine and add a hand-built test.
 5. Implement it in the C++ and Rust machines and add their instruction tests.
 6. Add a golden case when the compiler emits the opcode.
-7. Bump `ISA_MINOR`; bump `ISA_MAJOR` only for an incompatible change.
+7. Bump `ISA_MINOR` for an added opcode; bump `ISA_MAJOR` only for an incompatible change.
 
 ## 9. Adding a machine
 

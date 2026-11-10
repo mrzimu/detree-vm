@@ -1,6 +1,6 @@
 # Detree Specification
 
-**Status: draft, ISA v0.1.** This directory is the normative definition of the Detree machine. It is written for compiler authors and machine implementers, and it is independent of any particular downstream project.
+**Status: draft, ISA v0.2.** This directory is the normative definition of the Detree machine. It is written for compiler authors and machine implementers, and it is independent of any particular downstream project.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
@@ -25,11 +25,11 @@ Detree has three independent versions:
 |---|---|---|
 | **ISA** | `isa_major`/`isa_minor` in every module | `0.x` is unstable; `1.0` freezes the module format and opcode numbers |
 | **C ABI** | `DETREE_C_API_VERSION` in `kernel/include/detree.h` | increment on a struct-layout change or a changed symbol meaning |
-| **IR** | `IR_VERSION` in `detree.ir` | a compiler-side contract; a breaking change bumps the major version |
+| **IR** | `IR_VERSION` in `detree.ir` | a compiler-side contract; additive nodes bump the minor version with the ISA, a breaking change the major |
 
-The Python package version is independent of all three. A machine MUST reject a module whose `isa_major` it does not implement. It SHOULD reject a newer `isa_minor` because it cannot know the meaning of an opcode added after it was built; the conservative choice is the safe one.
+The Python package version is independent of all three. A machine MUST reject a module whose `isa_major` it does not implement.
 
-During `0.x` the ISA version is frozen at **0.1** (ADR 0006): opcodes may be added to the 0.x line without a minor bump, so `isa_minor` is not a forward-compatibility signal yet. What keeps a machine honest is the decoder: an opcode it does not know is a module error. `tools/gen_isa.py --check` keeps the version and magic in `isa.toml`, the Python package tables, and the Rust machine identical, so the "same ISA version" claim is verified rather than asserted.
+The minor version is a forward-compatibility signal: a machine built before an opcode was added cannot know its meaning, so it SHOULD also reject a module with a newer `isa_minor` rather than guess. Every additive change — a new opcode, a new buffer dtype, a new layout field kind — bumps `isa_minor`; a changed opcode number, operand shape, or meaning bumps `isa_major`. `tools/gen_isa.py --check` keeps the version and magic in `isa.toml`, the Python package tables, and the compiled machines identical, so the "same ISA version" claim is verified rather than asserted.
 
 ## Conformance levels
 

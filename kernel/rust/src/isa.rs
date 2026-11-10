@@ -10,7 +10,7 @@ pub const C_API_VERSION: u32 = 1;
 pub const ISA_MAJOR: u16 = 0;
 
 /// Additive changes bump the minor version.
-pub const ISA_MINOR: u16 = 1;
+pub const ISA_MINOR: u16 = 2;
 
 /// The first four bytes of every module.
 pub const MAGIC: [u8; 4] = *b"DETR";
@@ -95,6 +95,8 @@ pub enum Op {
     Entries = 0x4D,
     InitOffset = 0x4E,
     DataSize = 0x4F,
+    FnbBegin = 0x50,
+    FnbEnd = 0x51,
     OffsetAt = 0x60,
     OffsetSeek = 0x61,
     EventEnd = 0x62,
@@ -204,6 +206,8 @@ impl Op {
             0x4D => Op::Entries,
             0x4E => Op::InitOffset,
             0x4F => Op::DataSize,
+            0x50 => Op::FnbBegin,
+            0x51 => Op::FnbEnd,
             0x60 => Op::OffsetAt,
             0x61 => Op::OffsetSeek,
             0x62 => Op::EventEnd,
@@ -314,6 +318,8 @@ impl Op {
             Op::Entries => "ENTRIES",
             Op::InitOffset => "INIT_OFFSET",
             Op::DataSize => "DATA_SIZE",
+            Op::FnbBegin => "FNB_BEGIN",
+            Op::FnbEnd => "FNB_END",
             Op::OffsetAt => "OFFSET_AT",
             Op::OffsetSeek => "OFFSET_SEEK",
             Op::EventEnd => "EVENT_END",
@@ -396,7 +402,12 @@ impl Op {
     pub fn is_message(self) -> bool {
         matches!(
             self,
-            Op::Assert | Op::AssertCursorEq | Op::AssertStrEq | Op::Throw | Op::DebugPrint
+            Op::Assert
+                | Op::AssertCursorEq
+                | Op::AssertStrEq
+                | Op::Throw
+                | Op::DebugPrint
+                | Op::FnbEnd
         )
     }
 }

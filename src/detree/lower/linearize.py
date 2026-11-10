@@ -510,6 +510,12 @@ class Linearizer:
         if isinstance(node, nodes.SkipFNB):
             self.emit(Op.SKIP_FNB)
             return
+        if isinstance(node, nodes.FNBegin):
+            self.emit(Op.FNB_BEGIN)
+            return
+        if isinstance(node, nodes.FNEnd):
+            self.emit(Op.FNB_END, imm1=self.arena.message(node.msg))
+            return
         if isinstance(node, nodes.SkipVersion):
             self.emit(Op.SKIP_VERSION)
             return

@@ -95,6 +95,8 @@ namespace detree {
             std::size_t func = 0;
             std::size_t ip   = 0;
             std::uint8_t dst = 0;
+            /// Byte-count stack depth the callee must hand back on ``RET``.
+            std::size_t nb_depth = 0;
         };
 
         /// What a reference tag points at: an object, or a class.
@@ -114,6 +116,8 @@ namespace detree {
         }
 
         void need( std::size_t nbytes );
+        /// Fail when a return hands back a different byte-count depth.
+        void require_nb_depth( std::size_t expected );
         /// Read @p size big-endian bytes as one register value.
         std::uint64_t read_bits( std::size_t size );
         /// Read one scalar the way the Python reference loads a register:
@@ -154,6 +158,9 @@ namespace detree {
         std::size_t m_func_index = 0;
         std::size_t m_ip         = 0;
         bool m_halted            = true;
+
+        /// End positions of the open ``FNB_BEGIN`` regions, innermost last.
+        std::vector<std::uint64_t> m_nb_stack;
 
         /// One window per call depth; ``CALL`` moves to the next instead of copying.
         std::vector<std::uint64_t> m_reg_pool;

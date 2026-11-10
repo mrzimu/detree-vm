@@ -32,7 +32,7 @@ Capability bits:
 | 3 | `DETREE_CAP_REFS` | the reference table and `REF_*` opcodes |
 | 4 | `DETREE_CAP_LAYOUTS` | flat `READ_FIELDS` layouts |
 
-A backend that implements every v0.1 opcode returns `DETREE_CAP_ALL`.
+A backend that implements every v0.2 opcode returns `DETREE_CAP_ALL`.
 
 ## 3. Types
 
