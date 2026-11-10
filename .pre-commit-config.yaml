@@ -2,6 +2,10 @@ ci:
   autoupdate_commit_msg: 'chore: update pre-commit hooks'
   autofix_commit_msg: 'style: pre-commit fixes'
   autoupdate_schedule: monthly
+  # rustfmt is `language: system`, so it needs a cargo on PATH, which the
+  # pre-commit.ci container does not have. The `rust` job in run-tests.yml runs
+  # `cargo fmt --check` on every push and pull request instead.
+  skip: [rustfmt]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -585,7 +585,11 @@ def byte_count_mismatch() -> Case:
     The outer count promises one byte more than the members consume.
     """
     return _counted_object_case(
-        "byte_count_mismatch", struct.pack(">i", -7), inner_count=4, outer_count=9, record=False
+        "byte_count_mismatch",
+        struct.pack(">i", -7),
+        inner_count=4,
+        outer_count=9,
+        record=False,
     )
 
 
