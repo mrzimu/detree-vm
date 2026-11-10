@@ -262,7 +262,7 @@ class PythonMachine:
     """
 
     backend = "python"
-    isa = (0, 1)
+    isa = (0, 2)
 
     def __init__(self, raw: bytes) -> None:
         self.module = Module.from_bytes(raw)
@@ -287,6 +287,7 @@ class PythonMachine:
         self.event = 0
         self.entry_end = 0
         self.frames = []
+        self.nb_stack = []
         self.regs = []
         self.func = self.module.funcs[self.module.entry]
         self.ip = 0
@@ -369,6 +370,7 @@ class PythonMachine:
             self.event = event
             self.entry_end = self.offsets[event + 1]
             self.frames = []
+            self.nb_stack = []
             self.regs = [0] * entry.reg_count
             self.func = entry
             self.ip = 0
@@ -634,7 +636,7 @@ class PythonMachine:
             raise self._error(StackOverflow, f"call depth above {MAX_DEPTH}")
         callee = self.module.funcs[ins.imm1]
         argument = self.regs[ins.ra] if ins.ra < len(self.regs) else 0
-        self.frames.append((self.func, self.ip, ins.rd, self.regs))
+        self.frames.append((self.func, self.ip, ins.rd, self.regs, len(self.nb_stack)))
         self.regs = [0] * callee.reg_count
         if callee.arity:
             self.regs[0] = argument
@@ -644,11 +646,27 @@ class PythonMachine:
     def _h_ret(self, ins: Ins) -> None:
         value = self.regs[ins.ra] if ins.ra < len(self.regs) else 0
         if not self.frames:
+            self._require_frame_depth(0)
             self.halted = True
             return
-        func, ip, dst, regs = self.frames.pop()
+        func, ip, dst, regs, nb_depth = self.frames.pop()
+        self._require_frame_depth(nb_depth)
         regs[dst] = value
         self.func, self.ip, self.regs = func, ip, regs
+
+    def _require_frame_depth(self, expected: int) -> None:
+        """
+        Fail when a return leaves a byte-counted region open.
+
+        A function that opens a frame and returns before closing it would hand
+        the frame to its caller, where the next `FNB_END` would check the wrong
+        position.
+        """
+        if len(self.nb_stack) != expected:
+            raise self._error(
+                DetreeError,
+                f"return with byte-count depth {len(self.nb_stack)}, expected {expected}",
+            )
 
     # -- stream access ------------------------------------------------------
     def _h_sread(self, ins: Ins) -> None:
@@ -678,6 +696,24 @@ class PythonMachine:
         value = self._read(">I", 4)
         if not value & kByteCountMask:
             raise self._error(InvalidByteCount, f"fNBytes={value:#x} lacks kByteCountMask")
+
+    def _h_fnb_begin(self, ins: Ins) -> None:
+        value = self._read(">I", 4)
+        if not value & kByteCountMask:
+            raise self._error(InvalidByteCount, f"fNBytes={value:#x} lacks kByteCountMask")
+        if len(self.nb_stack) >= MAX_DEPTH:
+            raise self._error(StackOverflow, f"byte-count depth above {MAX_DEPTH}")
+        self.nb_stack.append(self.cursor + (value & ~kByteCountMask))
+
+    def _h_fnb_end(self, ins: Ins) -> None:
+        if not self.nb_stack:
+            raise self._error(DetreeError, "FNB_END with no open byte-count frame")
+        expected = self.nb_stack.pop()
+        if self.cursor != expected:
+            raise self._error(
+                AssertionFailed,
+                f"{self._msg(ins.imm1)} (expected {expected}, got {self.cursor})",
+            )
 
     def _h_skip_version(self, ins: Ins) -> None:
         self._need(2)
@@ -1038,6 +1074,8 @@ _DISPATCH = {
     Op.ENTRIES: PythonMachine._h_entries,
     Op.INIT_OFFSET: PythonMachine._h_init_offset,
     Op.DATA_SIZE: PythonMachine._h_data_size,
+    Op.FNB_BEGIN: PythonMachine._h_fnb_begin,
+    Op.FNB_END: PythonMachine._h_fnb_end,
     Op.OFFSET_AT: PythonMachine._h_offset_at,
     Op.OFFSET_SEEK: PythonMachine._h_offset_seek,
     Op.EVENT_END: PythonMachine._h_event_end,

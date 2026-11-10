@@ -25,7 +25,7 @@ flowchart TB
     compiler["Compiler<br/>(not in this repository)"]
     ir["Detree IR<br/>typed Python tree"]
     lower["Optimizer + lowering<br/>detree.opt, detree.lower"]
-    module["Module bytes<br/>ISA v0.1"]
+    module["Module bytes<br/>ISA v0.2"]
     reg["Backend registry<br/>detree.backends"]
     rust["Rust machine<br/>the shipped implementation"]
     api["Public API<br/>detree.Machine"]
@@ -98,7 +98,7 @@ One machine belongs to one thread. A caller that decodes baskets in parallel bui
 | Change | Requires |
 |---|---|
 | an optimizer pass | no module or ABI change; re-record the corpus |
-| a new opcode | `ISA_MINOR` bump, the Rust machine, corpus |
+| a new opcode | `ISA_MINOR` bump, the three machines, the corpus |
 | a new development build | the C ABI, the corpus, no compiler change |
 | a new compiler | the IR contract only |
 | a new buffer dtype | `ISA_MINOR` or major bump, the Rust machine |

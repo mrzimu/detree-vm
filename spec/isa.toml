@@ -1,4 +1,4 @@
-# Detree ISA v0.1 — machine-readable opcode table.
+# Detree ISA v0.2 — machine-readable opcode table.
 #
 # This file is the single source of truth for opcode numbers, operand shapes,
 # register reads/writes, and instruction flags. `tools/gen_isa.py --check`
@@ -48,7 +48,7 @@ TOBJECT_SKIP = 3
 [meta]
 instruction_size = 20
 isa_major = 0
-isa_minor = 1
+isa_minor = 2
 magic = "DETR"
 
 [[op]]
@@ -750,6 +750,26 @@ operands = "rd"
 reads = []
 summary = "Return the size of the current event's data."
 writes = ["rd"]
+
+[[op]]
+code = 0x50
+flags = ["stream", "can_trap"]
+group = "frame"
+name = "FNB_BEGIN"
+operands = ""
+reads = []
+summary = "Read a masked fNBytes and push the position where the counted region ends."
+writes = []
+
+[[op]]
+code = 0x51
+flags = ["verify", "can_trap"]
+group = "frame"
+name = "FNB_END"
+operands = "MSG"
+reads = []
+summary = "Pop the innermost counted region and fail unless the cursor is at its end."
+writes = []
 
 [[op]]
 code = 0x60

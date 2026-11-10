@@ -54,6 +54,7 @@ GROUPS = frozenset(
         "compare",
         "control",
         "flow",
+        "frame",
         "offsets",
         "ref",
         "state",
@@ -132,11 +133,11 @@ def rust_opcodes() -> dict[str, int]:
     return rows
 
 
-# Where each implementation declares the ISA version and magic. The ISA
-# version is frozen at 0.1 for the whole 0.x line (ADR 0006): new opcodes do
-# not bump it, and a machine rejects an opcode it does not know. The check is
-# still worth having -- a drift between the TOML and one implementation means
-# the "same ISA version" claim is false.
+# Where each implementation declares the ISA version and magic. Adding an
+# opcode bumps the minor version, so a machine built earlier rejects the
+# module instead of guessing the meaning of a byte it does not know. A drift
+# between the TOML and one implementation makes the "same ISA version" claim
+# false, which is what this check exists to catch.
 _PY_VERSION = (
     ("isa_major", re.compile(r"^ISA_MAJOR = (\d+)$", re.M)),
     ("isa_minor", re.compile(r"^ISA_MINOR = (\d+)$", re.M)),

@@ -487,6 +487,11 @@ def _check_stmt(stmt: nodes.Stmt, ctx: _Context) -> None:
         _require_str(stmt.b, ctx, "asserted string")
         _check_msg(stmt.msg, ctx)
         return
+    if isinstance(stmt, nodes.FNBegin):
+        return
+    if isinstance(stmt, nodes.FNEnd):
+        _check_msg(stmt.msg, ctx)
+        return
     if isinstance(stmt, nodes.Throw):
         _check_msg(stmt.msg, ctx)
         return

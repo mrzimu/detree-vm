@@ -14,8 +14,9 @@ from dataclasses import dataclass, field
 
 from ..spec.isa import BufferKind, FieldKind, Op, Typecode
 
-# The IR contract version. Breaking changes bump the major component.
-IR_VERSION = "0.1"
+# The IR contract version: additive node kinds bump the minor component,
+# breaking changes bump the major one.
+IR_VERSION = "0.2"
 
 # Value types. `bool` is a subtype of `i64`; `str` is an arena id.
 I64 = "i64"
@@ -658,6 +659,28 @@ class SkipFNB(Stmt):
 
 
 @dataclass
+class FNBegin(Stmt):
+    """
+    Open a region framed by a masked `fNBytes`.
+
+    The machine reads the count and remembers where the region ends, so the
+    matching `FNEnd` carries no position.  The pair is machine state, not a
+    register: a function that returns with a frame still open fails the run.
+    """
+
+
+@dataclass
+class FNEnd(Stmt):
+    """
+    Close the innermost byte-counted region.
+
+    The run fails unless the cursor is at the position `FNBegin` recorded.
+    """
+
+    msg: object = ""
+
+
+@dataclass
 class SkipVersion(Stmt):
     """
     Skip the int16 stream version.
@@ -887,6 +910,8 @@ __all__ = [
     "EventEnd",
     "F32",
     "F64",
+    "FNBegin",
+    "FNEnd",
     "ForRange",
     "Function",
     "I64",

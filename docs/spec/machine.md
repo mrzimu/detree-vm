@@ -1,6 +1,6 @@
 # Machine Model
 
-**Status: draft, ISA v0.1.**
+**Status: draft, ISA v0.2.**
 
 A **machine** is built once from a module's bytes and then reads basket after basket. It owns the per-basket event loop; bytecode never sees the loop.
 
@@ -9,7 +9,8 @@ A **machine** is built once from a module's bytes and then reads basket after ba
 ```text
 machine
 ├── regs[0..R)        64-bit slots, one window per call frame
-├── frames            (function id, return ip, return register)
+├── frames            (function id, return ip, return register, byte-count depth)
+├── nb_frames         end positions of the open `FNB_BEGIN` regions
 ├── stream            data[], entry_offsets[], cursor, initial_cursor, event_end
 ├── buffers[]         {dtype, kind, storage, count}
 ├── states[]          64-bit scalar state per decoder instance
@@ -17,7 +18,7 @@ machine
 └── strings           constant pool plus the per-run arena
 ```
 
-A machine is not thread-safe. Registers, the cursor, the frames, the buffers, the states, the references, and the arena are instance state. One machine belongs to one thread.
+A machine is not thread-safe. Registers, the cursor, the frames, the byte-count stack, the buffers, the states, the references, and the arena are instance state. One machine belongs to one thread.
 
 ## 2. Values
 
@@ -67,6 +68,14 @@ Every function has arity 0 or 1.
 
 The call depth is bounded. Exceeding the bound raises `StackOverflow`. The recommended bound is 256 frames.
 
+## 7.1 Byte-count frames
+
+`FNB_BEGIN` pushes the end position of a counted region on a stack of its own; `FNB_END` pops it and checks the cursor. The stack is machine state, not module state, so every run and every event starts with it empty.
+
+A call records the stack depth it entered with, and `RET` MUST hand that depth back. A function that opens a frame and returns before closing it would otherwise leave the frame where its caller's next `FNB_END` would pop it, and the caller would compare against the wrong position. Leaving a frame open across a return raises `DetreeError`, as does an `FNB_END` with no open frame.
+
+The depth is bounded like the call depth. Exceeding it raises `StackOverflow`.
+
 ## 8. Event loop
 
 The machine owns the loop; bytecode never sees it.
@@ -93,6 +102,7 @@ This shape keeps the caller/machine boundary at one call per basket and lets eac
 - buffers are empty and seeded with their declared `init`;
 - states hold their declared initial values;
 - the reference table is empty;
+- the byte-count stack is empty;
 - the arena holds only the module's constants;
 - the cursor is unset until `run`.
 
@@ -108,7 +118,7 @@ This shape keeps the caller/machine boundary at one call per basket and lets eac
 
 ## 11. Validation
 
-A machine MUST decode and validate a module before executing it. The checks are listed in [Module Format](module.md) §Validation and [Instruction Set](isa.md) §17.
+A machine MUST decode and validate a module before executing it. The checks are listed in [Module Format](module.md) §Validation and [Instruction Set](isa.md) §18.
 
 Validation is static: no basket can make a valid module invalid. A machine that cannot decode a module MUST fail before reading any basket byte.
 
@@ -123,9 +133,9 @@ All errors carry the instruction index, the cursor position (when known), and a 
 | `InvalidByteCount` | an `fNBytes` field lacks `kByteCountMask` |
 | `ReadLengthMismatch` | the cursor is not at the event boundary after `read` |
 | `UnsupportedFeature` | a reserved opcode or layout field is executed |
-| `AssertionFailed` | an `ASSERT*` or `THROW` opcode fails |
-| `StackOverflow` | the call depth limit is exceeded |
-| `DetreeError` | any other runtime failure (division by zero, empty buffer, ...) |
+| `AssertionFailed` | an `ASSERT*`, `THROW` or `FNB_END` check fails |
+| `StackOverflow` | the call or byte-count depth limit is exceeded |
+| `DetreeError` | any other runtime failure (division by zero, empty buffer, an `FNB_END` with no open frame, ...) |
 
 A runtime error MUST NOT crash the process. A machine that cannot report an error through its language binding MUST abort the run and leave the outputs in a consistent state.
 

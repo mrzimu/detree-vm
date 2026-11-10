@@ -537,6 +537,67 @@ def fnbytes_array() -> Case:
     return _one("fnbytes_array", builder, data)
 
 
+def _counted_object_case(
+    name: str, payload: bytes, inner_count: int, outer_count: int, record: bool
+) -> Case:
+    """
+    A module that opens two nested counted regions around one scalar.
+
+    A case that ends in an error declares no buffer: the corpus records the
+    status of a failed run, not partial output.
+    """
+    builder = Builder()
+    values = builder.buffer("values", "int32") if record else None
+    inner = builder.string("inner frame")
+    outer = builder.string("outer frame")
+    code = [
+        ins(Op.FNB_BEGIN),
+        ins(Op.FNB_BEGIN),
+        ins(Op.SREAD, rd=0, imm1=Typecode.INT32),
+    ]
+    if record:
+        code.append(ins(Op.BUF_APPEND, imm1=values, ra=0))
+    code += [
+        ins(Op.FNB_END, imm1=inner),
+        ins(Op.FNB_END, imm1=outer),
+        ins(Op.RET, ra=0),
+    ]
+    builder.function("read", code, reg_count=1)
+    data = (
+        struct.pack(">I", 0x40000000 | outer_count)
+        + struct.pack(">I", 0x40000000 | inner_count)
+        + payload
+    )
+    return _one(name, builder, data)
+
+
+def byte_count_frames() -> Case:
+    """
+    Two nested `FNB_BEGIN`/`FNB_END` pairs over one event.
+    """
+    return _counted_object_case(
+        "byte_count_frames", struct.pack(">i", -7), inner_count=4, outer_count=8, record=True
+    )
+
+
+def byte_count_mismatch() -> Case:
+    """
+    The outer count promises one byte more than the members consume.
+    """
+    return _counted_object_case(
+        "byte_count_mismatch", struct.pack(">i", -7), inner_count=4, outer_count=9, record=False
+    )
+
+
+def byte_count_open_frame() -> Case:
+    """
+    A function returns with a counted region still open.
+    """
+    builder = Builder()
+    builder.function("read", [ins(Op.FNB_BEGIN), ins(Op.RET, ra=0)], reg_count=1)
+    return _one("byte_count_open_frame", builder, struct.pack(">I", 0x40000004))
+
+
 CASES = (
     scalars,
     arithmetic,
@@ -554,6 +615,9 @@ CASES = (
     cross_dtype,
     variable_length_array,
     fnbytes_array,
+    byte_count_frames,
+    byte_count_mismatch,
+    byte_count_open_frame,
     underflow,
     invalid_byte_count,
     length_mismatch,

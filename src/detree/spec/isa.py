@@ -5,8 +5,9 @@ This module is the code form of `spec/isa.toml` and `docs/spec/isa.md`. It is
 pure data: no NumPy, no external library, no machine. A machine in another language
 implements the same numbers.
 
-The opcode values are part of the wire format. `1.0` freezes them; until then
-a change is an `ISA_MAJOR` bump.
+The opcode values are part of the wire format: adding an opcode bumps
+`ISA_MINOR`, and changing an existing one's number, operands, or meaning bumps
+`ISA_MAJOR`.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from enum import IntEnum, unique
 ISA_MAJOR = 0
 
 # Additive changes bump the minor version.
-ISA_MINOR = 1
+ISA_MINOR = 2
 
 # The first four bytes of every module.
 MAGIC = b"DETR"
@@ -114,6 +115,10 @@ class Op(IntEnum):
     ENTRIES = 0x4D
     INIT_OFFSET = 0x4E
     DATA_SIZE = 0x4F
+
+    # byte-count frames
+    FNB_BEGIN = 0x50
+    FNB_END = 0x51
 
     # offsets
     OFFSET_AT = 0x60
@@ -300,6 +305,7 @@ MESSAGE_OPS = frozenset(
         Op.ASSERT_STR_EQ,
         Op.THROW,
         Op.DEBUG_PRINT,
+        Op.FNB_END,
     }
 )
 

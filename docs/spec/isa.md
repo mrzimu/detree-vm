@@ -1,6 +1,6 @@
 # Instruction Set
 
-**Status: draft, ISA v0.1.** The opcode numbers in this document are generated from [isa.toml](../../spec/isa.toml); the prose is normative.
+**Status: draft, ISA v0.2.** The opcode numbers in this document are generated from [isa.toml](../../spec/isa.toml); the prose is normative.
 
 ## 1. Design decisions
 
@@ -16,6 +16,7 @@
 | `READ_FIELDS` | flat layouts only | nested structures use `CALL` and fine-grained opcodes |
 | Strings | interned ids | a register carries a `u32` id, never the bytes |
 | Buffer checks | always on | a stream violation raises, never crashes the process |
+| Byte-count frames | a stack in the machine | a counted object costs two instructions, and the machine can check the frame when the function returns |
 
 ## 2. Instruction encoding
 
@@ -156,7 +157,26 @@ Every access is bounds-checked against the current event's data. A violation rai
 
 `SREAD_FNB` validates that the `kByteCountMask` (`0x40000000`) is set and returns the value with the mask cleared. A missing mask raises `InvalidByteCount`. `SKIP_OBJHDR` reads `fNBytes`; when the tag is `kNewClassTag` (`0xFFFFFFFF`) it also skips a NUL-terminated class name.
 
-## 8. Event offsets (0x60–0x62)
+## 8. Byte-count frames (0x50–0x51)
+
+A ROOT object framed by its byte count declares how many bytes follow it. These two opcodes keep the end position in the machine, so a decoder does not carry it in a register and the machine can check the frame when the function returns.
+
+| Opcode | Hex | Operands | Semantics |
+|---|---|---|---|
+| `FNB_BEGIN` | 0x50 | — | Read a masked `fNBytes`, validating the mask, and push `cursor + nbytes`. |
+| `FNB_END` | 0x51 | `MSG` | Pop the stack; fail unless `cursor` equals the popped value. |
+
+`FNB_BEGIN` is the framed form of `SREAD_FNB`: it consumes the same four bytes and validates the same mask, and it also records where the counted object ends. A machine keeps one stack of end positions:
+
+- `run` starts with an empty stack, and every event starts empty too;
+- `FNB_BEGIN` past the call-depth limit (256) raises `StackOverflow`;
+- `FNB_END` with an empty stack raises `DetreeError`;
+- `FNB_END` with the cursor elsewhere raises `AssertionFailed`, with the module's `MSG` followed by `(expected N, got M)`;
+- a return that would leave a frame open raises `DetreeError`: the machine records the stack depth at `CALL` and requires that depth back at `RET`. A function that opens a frame and returns before closing it is a decoder bug, not bad data.
+
+The stack is machine state, not module state: two runs never share it, and `reset()` drops it. A module that never emits `FNB_BEGIN` is unaffected, because its depth is always zero.
+
+## 9. Event offsets (0x60–0x62)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -166,7 +186,7 @@ Every access is bounds-checked against the current event's data. A violation rai
 
 `OFFSET_SEEK` is the primitive that finds the end of a jagged array without a linear scan in the decoder.
 
-## 9. Coarse-grained reads (0x70–0x75)
+## 10. Coarse-grained reads (0x70–0x75)
 
 These are the performance tier. A machine SHOULD implement them as native loops, not as a dispatch per element.
 
@@ -185,7 +205,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 
 `READ_BULK` and `READ_APPEND` convert the stream value to the buffer dtype. An integer buffer wraps modulo its width; a float buffer receives the IEEE-754 bit pattern of a float typecode, or a real value when the typecode is integral.
 
-## 10. Buffer access (0x80–0x86)
+## 11. Buffer access (0x80–0x86)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -199,7 +219,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 
 `BUF_APPEND_OFFSET` requires an `OFFSETS` buffer with at least one element. `BUF_LAST` on an empty buffer raises `DetreeError`. `BUF_RESERVE` has no effect on the output; it is a capacity hint.
 
-## 11. Program state (0x90–0x92)
+## 12. Program state (0x90–0x92)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -207,7 +227,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 | `STATE_SET` | 0x91 | `SLOT`, `ra` | `states[SLOT] = ra`. |
 | `STATE_IADD` | 0x92 | `SLOT`, `IMM` | `states[SLOT] += IMM` (wrapping). |
 
-## 12. Object references (0xA0–0xA5)
+## 13. Object references (0xA0–0xA5)
 
 The reference table maps a `u32` tag to an object index and an optional class name. It is the primitive behind ROOT object graphs.
 
@@ -220,7 +240,7 @@ The reference table maps a `u32` tag to an object index and an optional class na
 | `REF_SET_CLASS` | 0xA4 | `ra`, `rb` | `refs[ra].class = rb`. |
 | `REF_COUNT` | 0xA5 | `rd` | Number of entries. |
 
-## 13. Strings (0xB0–0xB3)
+## 14. Strings (0xB0–0xB3)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -231,7 +251,7 @@ The reference table maps a `u32` tag to an object index and an optional class na
 
 The arena is per run and seeded with the module's constants in order. `-1` means "no string"; it is not a valid index.
 
-## 14. Verification and errors (0xC0–0xC3)
+## 15. Verification and errors (0xC0–0xC3)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -240,9 +260,9 @@ The arena is per run and seeded with the module's constants in order. `-1` means
 | `ASSERT_STR_EQ` | 0xC2 | `ra`, `rb`, `MSG` | Fail unless two string ids are equal. |
 | `THROW` | 0xC3 | `MSG` | Raise an unconditional decoder error. |
 
-## 15. Worked examples
+## 16. Worked examples
 
-### 15.1 A scalar decoder
+### 16.1 A scalar decoder
 
 Read one value per event and append it to `data`:
 
@@ -252,7 +272,7 @@ Read one value per event and append it to `data`:
   RET         r0
 ```
 
-### 15.2 A sequence decoder
+### 16.2 A sequence decoder
 
 Read a count, append the next offset, then read the elements in bulk:
 
@@ -263,7 +283,7 @@ Read a count, append the next offset, then read the elements in bulk:
   RET                r0
 ```
 
-### 15.3 A jagged array
+### 16.3 A jagged array
 
 Find the next entry offset and let a child decoder read until it:
 
@@ -275,7 +295,7 @@ Find the next entry offset and let a child decoder read until it:
   RET            r2
 ```
 
-### 15.4 A `TObject` header
+### 16.4 A `TObject` header
 
 ```text
   SKIP_VERSION
@@ -294,7 +314,21 @@ L1:
   RET          r0
 ```
 
-## 16. Performance requirements
+### 16.5 A counted object
+
+The object declares its size, so the machine holds the end position while the members are read:
+
+```text
+  FNB_BEGIN
+  SKIP_VERSION
+  CALL         r0, member.read, r0
+  FNB_END      "the members did not consume the byte count"
+  RET          r0
+```
+
+`FNB_END` fails where the old sequence would have compared a register: the machine knows the expected offset, so the message can name both it and the cursor.
+
+## 17. Performance requirements
 
 The machine's cost is dominated by dispatch frequency. A compiler SHOULD keep hot loops inside coarse opcodes:
 
@@ -309,10 +343,10 @@ The machine's cost is dominated by dispatch frequency. A compiler SHOULD keep ho
 
 A decoder that executes three or more instructions per element will be several times slower than a native decoder graph.
 
-## 17. Reserved opcodes
+## 18. Reserved opcodes
 
-The following ranges are reserved and MUST NOT be emitted in v0.1:
+The following ranges are reserved and MUST NOT be emitted in v0.2:
 
-`0x0D–0x0F`, `0x2A–0x2F`, `0x3F`, `0x50–0x5F`, `0x63–0x6F`, `0x76–0x7F`, `0x87–0x8F`, `0x93–0x9F`, `0xA6–0xAF`, `0xB4–0xBF`, `0xC4–0xFF`.
+`0x0D–0x0F`, `0x2A–0x2F`, `0x3F`, `0x52–0x5F`, `0x63–0x6F`, `0x76–0x7F`, `0x87–0x8F`, `0x93–0x9F`, `0xA6–0xAF`, `0xB4–0xBF`, `0xC4–0xFF`.
 
-A module that contains an opcode outside the v0.1 table is invalid and MUST be rejected at validation with `DETREE_MODULE_ERROR`. A machine does not guess the width or meaning of an opcode it does not know.
+A module that contains an opcode outside the v0.2 table is invalid and MUST be rejected at validation with `DETREE_MODULE_ERROR`. A machine does not guess the width or meaning of an opcode it does not know.

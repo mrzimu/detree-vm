@@ -141,6 +141,10 @@ def _stmts(body: list, indent: int) -> list[str]:
             lines.append(f"{pad}skip_r {_expr(stmt.value)}")
         elif isinstance(stmt, nodes.SkipFNB):
             lines.append(f"{pad}skip_fnb")
+        elif isinstance(stmt, nodes.FNBegin):
+            lines.append(f"{pad}fnb_begin")
+        elif isinstance(stmt, nodes.FNEnd):
+            lines.append(f"{pad}fnb_end {_msg(stmt.msg)}")
         elif isinstance(stmt, nodes.SkipVersion):
             lines.append(f"{pad}skip_version")
         elif isinstance(stmt, nodes.SkipTObject):

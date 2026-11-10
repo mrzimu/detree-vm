@@ -9,7 +9,12 @@ import struct
 import pytest
 from module_builder import Builder, ins
 
-from detree.spec.errors import StreamUnderflow
+from detree.spec.errors import (
+    AssertionFailed,
+    DetreeError,
+    StackOverflow,
+    StreamUnderflow,
+)
 from detree.spec.isa import BufferKind, Op, Typecode
 from detree.spec.module import Module
 from detree.vm import PythonMachine
@@ -101,3 +106,81 @@ def test_stream_underflow_is_reported():
 
     with pytest.raises(StreamUnderflow):
         machine.run(b"\x00\x00", [0, 2])
+
+
+# -- byte-count frames ---------------------------------------------------------
+def _nested_frames_module() -> bytes:
+    builder = Builder()
+    values = builder.buffer("values", "int32")
+    inner = builder.string("inner frame")
+    outer = builder.string("outer frame")
+    builder.function(
+        "read",
+        [
+            ins(Op.FNB_BEGIN),
+            ins(Op.FNB_BEGIN),
+            ins(Op.SREAD, rd=0, imm1=Typecode.INT32),
+            ins(Op.BUF_APPEND, imm1=values, ra=0),
+            ins(Op.FNB_END, imm1=inner),
+            ins(Op.FNB_END, imm1=outer),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=1,
+    )
+    return builder.build().to_bytes()
+
+
+def _nested_frames_basket(outer_count: int) -> bytes:
+    return (
+        struct.pack(">I", 0x40000000 | outer_count)
+        + struct.pack(">I", 0x40000004)
+        + struct.pack(">i", 7)
+    )
+
+
+def test_byte_count_frames_nest_and_check():
+    machine = PythonMachine(_nested_frames_module())
+    basket = _nested_frames_basket(8)
+
+    assert machine.run(basket, [0, len(basket)])["values"].tolist() == [7]
+
+
+def test_byte_count_mismatch_names_both_positions():
+    machine = PythonMachine(_nested_frames_module())
+    basket = _nested_frames_basket(9)
+
+    with pytest.raises(AssertionFailed) as info:
+        machine.run(basket, [0, len(basket)])
+
+    assert "outer frame (expected 13, got 12)" in str(info.value)
+
+
+def test_byte_count_end_without_begin_is_an_error():
+    builder = Builder()
+    message = builder.string("orphan frame")
+    builder.function(
+        "read", [ins(Op.FNB_END, imm1=message), ins(Op.RET, ra=0)], reg_count=1
+    )
+    machine = PythonMachine(builder.build().to_bytes())
+
+    with pytest.raises(DetreeError, match="no open byte-count frame"):
+        machine.run(b"", [0, 0])
+
+
+def test_a_return_with_an_open_frame_is_an_error():
+    builder = Builder()
+    builder.function("read", [ins(Op.FNB_BEGIN), ins(Op.RET, ra=0)], reg_count=1)
+    machine = PythonMachine(builder.build().to_bytes())
+
+    with pytest.raises(DetreeError, match="byte-count depth 1, expected 0"):
+        machine.run(struct.pack(">I", 0x40000004), [0, 4])
+
+
+def test_byte_count_depth_is_capped():
+    builder = Builder()
+    builder.function("read", [ins(Op.FNB_BEGIN)] * 257 + [ins(Op.RET, ra=0)], reg_count=1)
+    machine = PythonMachine(builder.build().to_bytes())
+    basket = struct.pack(">I", 0x40000000) * 257
+
+    with pytest.raises(StackOverflow):
+        machine.run(basket, [0, len(basket)])

@@ -50,7 +50,7 @@ static size_t build_halt_module( uint8_t* out ) {
     memcpy( at, "DETR", 4 );
     at += 4;
     at = put16( at, 0 ); /* isa_major */
-    at = put16( at, 1 ); /* isa_minor */
+    at = put16( at, 2 ); /* isa_minor */
     at = put16( at, 0 ); /* entry */
     at = put16( at, 0 ); /* regs_max */
     at = put32( at, 0 ); /* buffers */
@@ -91,7 +91,7 @@ int main( void ) {
     assert( strcmp( detree_backend_name(), "cpp" ) == 0 );
     assert( detree_backend_version() != NULL );
     assert( detree_isa_major() == 0 );
-    assert( detree_isa_minor() == 1 );
+    assert( detree_isa_minor() == 2 );
     assert( detree_capabilities() == DETREE_CAP_ALL );
 
     /* A null module is a caller error, reported without crashing. */
@@ -115,7 +115,7 @@ int main( void ) {
     machine     = detree_machine_new( module, module_size );
     assert( machine != NULL );
     assert( detree_machine_isa_major( machine ) == 0 );
-    assert( detree_machine_isa_minor( machine ) == 1 );
+    assert( detree_machine_isa_minor( machine ) == 2 );
     assert( detree_buffer_count( machine ) == 0 );
     assert( detree_state_count( machine ) == 0 );
 

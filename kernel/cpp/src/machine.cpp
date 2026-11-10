@@ -67,6 +67,7 @@ namespace detree {
         m_event         = 0;
         m_entry_end     = 0;
         m_frames.clear();
+        m_nb_stack.clear();
         m_depth      = 0;
         m_func_index = m_module.entry;
         m_ip         = 0;
@@ -154,6 +155,7 @@ namespace detree {
             m_event     = event;
             m_entry_end = static_cast<std::size_t>( offsets[event + 1] );
             m_frames.clear();
+            m_nb_stack.clear();
             m_depth      = 0;
             m_func_index = m_module.entry;
             m_reg_count  = entry.reg_count;
@@ -178,6 +180,14 @@ namespace detree {
         {
             fail<StreamUnderflow>( "need " + std::to_string( nbytes ) + " bytes, " +
                                    std::to_string( m_data_len - m_cursor ) + " left" );
+        }
+    }
+
+    void Machine::require_nb_depth( std::size_t expected ) {
+        if ( m_nb_stack.size() != expected )
+        {
+            fail<Error>( "return with byte-count depth " + std::to_string( m_nb_stack.size() ) +
+                         ", expected " + std::to_string( expected ) );
         }
     }
 
@@ -362,6 +372,7 @@ namespace detree {
             frame.func = m_func_index;
             frame.ip   = m_ip;
             frame.dst  = ins.rd;
+            frame.nb_depth = m_nb_stack.size();
             m_frames.push_back( frame );
 
             // Switch to the callee's window instead of moving the caller's: the
@@ -380,12 +391,14 @@ namespace detree {
             const std::uint64_t value = ins.ra < m_reg_count ? reg( ins.ra ) : 0;
             if ( m_frames.empty() )
             {
+                require_nb_depth( 0 );
                 m_halted = true;
                 return;
             }
             const Frame frame = m_frames.back();
             m_frames.pop_back();
 
+            require_nb_depth( frame.nb_depth );
             --m_depth;
             m_func_index           = frame.func;
             m_ip                   = frame.ip;
@@ -448,6 +461,34 @@ namespace detree {
             {
                 fail<InvalidByteCount>( "fNBytes=" + std::to_string( value ) +
                                         " lacks kByteCountMask" );
+            }
+            return;
+        }
+        case Op::FNB_BEGIN: {
+            const std::uint64_t value = read_bits( 4 );
+            if ( ( value & 0x40000000 ) == 0 )
+            {
+                fail<InvalidByteCount>( "fNBytes=" + std::to_string( value ) +
+                                        " lacks kByteCountMask" );
+            }
+            if ( m_nb_stack.size() >= kMaxDepth )
+            {
+                fail<StackOverflow>( "byte-count depth above " + std::to_string( kMaxDepth ) );
+            }
+            m_nb_stack.push_back( static_cast<std::uint64_t>( m_cursor ) +
+                                  ( value & ~static_cast<std::uint64_t>( 0x40000000 ) ) );
+            return;
+        }
+        case Op::FNB_END: {
+            if ( m_nb_stack.empty() )
+            { fail<Error>( "FNB_END with no open byte-count frame" ); }
+            const std::uint64_t expected = m_nb_stack.back();
+            m_nb_stack.pop_back();
+            if ( m_cursor != expected )
+            {
+                fail<AssertionFailed>( message_of( ins.imm1 ) + " (expected " +
+                                       std::to_string( expected ) + ", got " +
+                                       std::to_string( m_cursor ) + ")" );
             }
             return;
         }
