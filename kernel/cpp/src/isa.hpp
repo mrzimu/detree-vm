@@ -12,7 +12,7 @@ namespace detree {
     /// The machine implements this major version, and only this one.
     inline constexpr std::uint16_t kIsaMajor = 0;
     /// Minor versions are additive; a newer minor is refused.
-    inline constexpr std::uint16_t kIsaMinor = 2;
+    inline constexpr std::uint16_t kIsaMinor = 3;
 
     /// Bytes per instruction: one opcode, three register bytes, two i64.
     inline constexpr std::size_t kInsSize = 20;
@@ -96,6 +96,8 @@ namespace detree {
         DATA_SIZE         = 0x4F,
         FNB_BEGIN         = 0x50,
         FNB_END           = 0x51,
+        SREAD_TSTR        = 0x52,
+        SKIP_TSTR         = 0x53,
         OFFSET_AT         = 0x60,
         OFFSET_SEEK       = 0x61,
         EVENT_END         = 0x62,

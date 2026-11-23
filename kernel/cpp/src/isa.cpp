@@ -14,7 +14,7 @@ namespace detree {
         };
 
         // Ordered like the ISA document so a missing row is easy to spot.
-        constexpr std::array<OpName, 105> kOpNames = { {
+        constexpr std::array<OpName, 107> kOpNames = { {
             { Op::HALT, "HALT" },
             { Op::NOP, "NOP" },
             { Op::LINE, "LINE" },
@@ -87,6 +87,8 @@ namespace detree {
             { Op::DATA_SIZE, "DATA_SIZE" },
             { Op::FNB_BEGIN, "FNB_BEGIN" },
             { Op::FNB_END, "FNB_END" },
+            { Op::SREAD_TSTR, "SREAD_TSTR" },
+            { Op::SKIP_TSTR, "SKIP_TSTR" },
             { Op::OFFSET_AT, "OFFSET_AT" },
             { Op::OFFSET_SEEK, "OFFSET_SEEK" },
             { Op::EVENT_END, "EVENT_END" },

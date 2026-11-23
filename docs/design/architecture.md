@@ -25,7 +25,7 @@ flowchart TB
     compiler["Compiler<br/>(not in this repository)"]
     ir["Detree IR<br/>typed Python tree"]
     lower["Optimizer + lowering<br/>detree.opt, detree.lower"]
-    module["Module bytes<br/>ISA v0.2"]
+    module["Module bytes<br/>ISA v0.3"]
     reg["Backend registry<br/>detree.backends"]
     rust["Rust machine<br/>the shipped implementation"]
     api["Public API<br/>detree.Machine"]

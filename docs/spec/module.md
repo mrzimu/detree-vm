@@ -1,6 +1,6 @@
 # Module Format
 
-**Status: draft, ISA v0.2.**
+**Status: draft, ISA v0.3.**
 
 A **module** is the unit of compilation, caching, and distribution. It contains everything a machine needs to execute a decoding program: code, buffer declarations, state declarations, string constants, layouts, and the function table. A machine receives module **bytes** and nothing else.
 
@@ -91,13 +91,13 @@ A machine does not check that an appended value fits the declared width: an `OFF
 
 ## States
 
-A state slot is a 64-bit value that survives across events. `flags` bit 0 marks a **name slot**: the slot holds a string-arena id, and `-1` means "no string". Every other bit MUST be zero in v0.2.
+A state slot is a 64-bit value that survives across events. `flags` bit 0 marks a **name slot**: the slot holds a string-arena id, and `-1` means "no string". Every other bit MUST be zero in v0.3.
 
 A name slot is why the flag is in the format rather than in the frontend: a machine has to know how to decode the value it reports at the end of a run.
 
 ## Strings
 
-`strings[]` holds class names and message templates. The arena is seeded with these constants in order, so `STR_CONST rd, k` is the constant at index `k`. `SREAD_CSTR` interns what it reads; `STR_EQ` is therefore an id comparison.
+`strings[]` holds class names and message templates. The arena is seeded with these constants in order, so `STR_CONST rd, k` is the constant at index `k`. `SREAD_CSTR` interns what it reads, and `SREAD_TSTR` does the same for a length-prefixed string; `STR_EQ` is therefore an id comparison.
 
 A string id is a `u32` in a register. `-1` means "no string" and MUST NOT be used as an index.
 
@@ -112,7 +112,7 @@ A layout is a flat sequence of fields for `READ_FIELDS`. `field.kind` is one of:
 | `ARRAY_FIXED` | 2 | read `count` scalars into `buffer_id` |
 | `TOBJECT_SKIP` | 3 | skip a `TObject` header |
 
-A `buffer_id` of `-1` means "not a buffer". `SCALAR` and `ARRAY_FIXED` MUST reference an existing buffer. `TOBJECT_SKIP` is reserved in v0.2; executing a layout that contains it MUST raise `UnsupportedFeature`.
+A `buffer_id` of `-1` means "not a buffer". `SCALAR` and `ARRAY_FIXED` MUST reference an existing buffer. `TOBJECT_SKIP` is reserved in v0.3; executing a layout that contains it MUST raise `UnsupportedFeature`.
 
 ## Functions
 

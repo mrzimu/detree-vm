@@ -262,7 +262,7 @@ class PythonMachine:
     """
 
     backend = "python"
-    isa = (0, 2)
+    isa = (0, 3)
 
     def __init__(self, raw: bytes) -> None:
         self.module = Module.from_bytes(raw)
@@ -959,6 +959,23 @@ class PythonMachine:
         self.cursor += 1
         self.regs[ins.rd] = self._intern(text)
 
+    def _h_sread_tstr(self, ins: Ins) -> None:
+        size = self._read(">B", 1)
+        if size == 255:
+            size = self._read(">I", 4)
+        self._need(size)
+        start = self.cursor
+        self.cursor += size
+        text = self.data[start : self.cursor].tobytes().decode()
+        self.regs[ins.rd] = self._intern(text)
+
+    def _h_skip_tstr(self, ins: Ins) -> None:
+        size = self._read(">B", 1)
+        if size == 255:
+            size = self._read(">I", 4)
+        self._need(size)
+        self.cursor += size
+
     def _h_str_const(self, ins: Ins) -> None:
         self.regs[ins.rd] = ins.imm1
 
@@ -1062,6 +1079,8 @@ _DISPATCH = {
     Op.SREAD_FNB: PythonMachine._h_sread_fnb,
     Op.SREAD_VERSION: PythonMachine._h_sread_version,
     Op.SREAD_CSTR: PythonMachine._h_sread_cstr,
+    Op.SREAD_TSTR: PythonMachine._h_sread_tstr,
+    Op.SKIP_TSTR: PythonMachine._h_skip_tstr,
     Op.SKIP: PythonMachine._h_skip,
     Op.SKIP_R: PythonMachine._h_skip_r,
     Op.SKIP_FNB: PythonMachine._h_skip_fnb,

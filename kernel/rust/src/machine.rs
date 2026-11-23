@@ -723,6 +723,28 @@ impl Machine {
                 let id = self.intern(&text);
                 self.set_reg(ins.rd, id);
             }
+            Op::SreadTstr => {
+                let mut size = self.read_bits(1)?;
+                if size == 255 {
+                    size = self.read_bits(4)?;
+                }
+                let start = self.cursor;
+                self.need(size as usize)?;
+                self.cursor += size as usize;
+                // SAFETY: `need` confirmed the range is inside the run's data.
+                let bytes = unsafe { slice::from_raw_parts(self.data.add(start), size as usize) };
+                let text = String::from_utf8_lossy(bytes);
+                let id = self.intern(&text);
+                self.set_reg(ins.rd, id);
+            }
+            Op::SkipTstr => {
+                let mut size = self.read_bits(1)?;
+                if size == 255 {
+                    size = self.read_bits(4)?;
+                }
+                self.need(size as usize)?;
+                self.cursor += size as usize;
+            }
             Op::Skip => {
                 let nbytes = ins.imm1 as usize;
                 self.need(nbytes)?;

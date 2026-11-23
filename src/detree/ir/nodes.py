@@ -16,7 +16,7 @@ from ..spec.isa import BufferKind, FieldKind, Op, Typecode
 
 # The IR contract version: additive node kinds bump the minor component,
 # breaking changes bump the major one.
-IR_VERSION = "0.2"
+IR_VERSION = "0.3"
 
 # Value types. `bool` is a subtype of `i64`; `str` is an arena id.
 I64 = "i64"
@@ -337,6 +337,16 @@ class StreamReadCString(Expr):
     Read a NUL-terminated string as a name-slot id.
 
     The bytes are interned in the machine's string arena.
+    """
+
+
+@dataclass
+class StreamReadTString(Expr):
+    """
+    Read a length-prefixed `TString` as a name-slot id.
+
+    The prefix is one byte, or `0xFF` followed by a `uint32`; the bytes are
+    then interned in the machine's string arena.
     """
 
 
@@ -717,6 +727,15 @@ class SkipCStr(Stmt):
 
 
 @dataclass
+class SkipTString(Stmt):
+    """
+    Skip a length-prefixed `TString`.
+
+    The prefix is one byte, or `0xFF` followed by a `uint32`.
+    """
+
+
+@dataclass
 class SetCursor(Stmt):
     """
     Set the stream cursor.
@@ -946,6 +965,7 @@ __all__ = [
     "SkipObjHdr",
     "SkipR",
     "SkipTObject",
+    "SkipTString",
     "SkipVersion",
     "State",
     "StateGet",
@@ -953,6 +973,7 @@ __all__ = [
     "StreamRead",
     "StreamReadCString",
     "StreamReadFNB",
+    "StreamReadTString",
     "StreamReadVersion",
     "StrConst",
     "StrEq",

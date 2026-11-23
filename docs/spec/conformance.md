@@ -1,6 +1,6 @@
 # Conformance
 
-**Status: draft, ISA v0.2.**
+**Status: draft, ISA v0.3.**
 
 A machine is conformant when it replays every case in the golden corpus with the recorded status, instruction index, cursor, buffers, and states, and when its C ABI matches the declared layout. This document defines the levels, the corpus, and the checks a machine must pass.
 
@@ -63,8 +63,8 @@ Every opcode family MUST appear in at least one case. The minimum set is:
 | arithmetic | every operator, plus division by zero |
 | comparison | signed, unsigned, equality |
 | control flow | `JMP`, `JZ`, `JNZ`, every `BR_*`, `CALL`, `RET`, recursion depth |
-| scalar stream | every typecode, `SREAD_FNB`, `SREAD_VERSION`, `SREAD_CSTR` |
-| skips | `SKIP`, `SKIP_R`, `SKIP_FNB`, `SKIP_VERSION`, `SKIP_TOBJECT`, `SKIP_OBJHDR`, `SKIP_CSTR` |
+| scalar stream | every typecode, `SREAD_FNB`, `SREAD_VERSION`, `SREAD_CSTR`, `SREAD_TSTR` |
+| skips | `SKIP`, `SKIP_R`, `SKIP_FNB`, `SKIP_VERSION`, `SKIP_TOBJECT`, `SKIP_OBJHDR`, `SKIP_CSTR`, `SKIP_TSTR` |
 | byte-count frames | `FNB_BEGIN`, `FNB_END`, a nested pair, a mismatch, an unmatched end, a return with a frame open |
 | cursor | `CURSOR`, `SET_CURSOR`, `ENTRIES`, `INIT_OFFSET`, `DATA_SIZE` |
 | offsets | `OFFSET_AT`, `OFFSET_SEEK`, `EVENT_END` |

@@ -344,6 +344,9 @@ class Linearizer:
         if isinstance(node, nodes.StreamReadCString):
             self.emit(Op.SREAD_CSTR, rd=dest)
             return dest
+        if isinstance(node, nodes.StreamReadTString):
+            self.emit(Op.SREAD_TSTR, rd=dest)
+            return dest
         if isinstance(node, nodes.Unary):
             value = self.expr(node.x)
             self.emit(op_of(node.op), rd=dest, ra=value)
@@ -527,6 +530,9 @@ class Linearizer:
             return
         if isinstance(node, nodes.SkipCStr):
             self.emit(Op.SKIP_CSTR)
+            return
+        if isinstance(node, nodes.SkipTString):
+            self.emit(Op.SKIP_TSTR)
             return
         if isinstance(node, nodes.SetCursor):
             value = self.expr(node.value)

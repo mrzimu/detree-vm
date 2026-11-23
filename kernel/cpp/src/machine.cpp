@@ -442,6 +442,25 @@ namespace detree {
             reg( ins.rd ) = intern( text );
             return;
         }
+        case Op::SREAD_TSTR: {
+            std::uint64_t size = read_bits( 1 );
+            if ( size == 255 ) { size = read_bits( 4 ); }
+            const std::size_t start  = m_cursor;
+            const std::size_t length = static_cast<std::size_t>( size );
+            need( length );
+            m_cursor += length;
+            const std::string text( reinterpret_cast<const char*>( m_data + start ),
+                                    length );
+            reg( ins.rd ) = intern( text );
+            return;
+        }
+        case Op::SKIP_TSTR: {
+            std::uint64_t size = read_bits( 1 );
+            if ( size == 255 ) { size = read_bits( 4 ); }
+            need( static_cast<std::size_t>( size ) );
+            m_cursor += static_cast<std::size_t>( size );
+            return;
+        }
         case Op::SKIP:
             need( static_cast<std::size_t>( ins.imm1 ) );
             m_cursor += static_cast<std::size_t>( ins.imm1 );

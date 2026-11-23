@@ -143,6 +143,7 @@ namespace detree {
             case Op::SREAD_FNB:
             case Op::SREAD_VERSION:
             case Op::SREAD_CSTR:
+            case Op::SREAD_TSTR:
             case Op::CURSOR:
             case Op::ENTRIES:
             case Op::INIT_OFFSET:

@@ -1,6 +1,6 @@
 # IR, Optimizer, and Lowering
 
-**Status: draft, IR v0.2.**
+**Status: draft, IR v0.3.**
 
 The IR is a **compiler-side contract**. A compiler builds a typed tree; the optimizer rewrites it; the lowering pass turns it into a module. Machines never see the IR.
 
@@ -70,6 +70,7 @@ The verifier checks that a value is used where its type is valid. Floats are pas
 | `StreamReadFNB()` | `i64` | read a masked `fNBytes` length |
 | `StreamReadVersion()` | `i64` | read the int16 `fVersion` |
 | `StreamReadCString()` | `str` | read and intern a C string |
+| `StreamReadTString()` | `str` | read and intern a length-prefixed string |
 | `Unary(op, x)` | `i64`/`bool` | `NEG`, `NOT`, `NOT_B` |
 | `Binary(op, a, b)` | `i64` | integer arithmetic and bitwise ops |
 | `Compare(op, a, b)` | `bool` | comparison |
@@ -100,7 +101,7 @@ The verifier checks that a value is used where its type is valid. Floats are pas
 | `ReadFields(layout, count)` | flat layout read |
 | `ReadAppend(buf, typecode)` | read one and append |
 | `Skip(bytes)` / `SkipR(expr)` | advance the cursor |
-| `SkipFNB` / `SkipVersion` / `SkipTObject` / `SkipObjHdr` / `SkipCStr` | domain skips |
+| `SkipFNB` / `SkipVersion` / `SkipTObject` / `SkipObjHdr` / `SkipCStr` / `SkipTString` | domain skips |
 | `FNBegin()` / `FNEnd(msg)` | open and close a byte-counted region |
 | `SetCursor(expr)` | set the cursor |
 | `CallStmt(target, func, arg)` | call and assign the result |
@@ -200,4 +201,4 @@ The lowering MUST be deterministic: the same IR produces the same bytes in every
 
 ## 11. Versioning
 
-`detree.ir.IR_VERSION` is `"0.2"`. The IR is a public contract for compilers. Additive node kinds and optional fields bump the minor version, and a change that adds nodes for new opcodes bumps it together with `isa_minor`; a breaking change bumps the major version and documents the migration in the changelog.
+`detree.ir.IR_VERSION` is `"0.3"`. The IR is a public contract for compilers. Additive node kinds and optional fields bump the minor version, and a change that adds nodes for new opcodes bumps it together with `isa_minor`; a breaking change bumps the major version and documents the migration in the changelog.

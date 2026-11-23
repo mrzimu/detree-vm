@@ -589,6 +589,7 @@ fn uses_rd(op: Op) -> bool {
             | Op::SreadFnb
             | Op::SreadVersion
             | Op::SreadCstr
+            | Op::SreadTstr
             | Op::Cursor
             | Op::Entries
             | Op::InitOffset

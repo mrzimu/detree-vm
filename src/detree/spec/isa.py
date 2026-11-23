@@ -19,7 +19,7 @@ from enum import IntEnum, unique
 ISA_MAJOR = 0
 
 # Additive changes bump the minor version.
-ISA_MINOR = 2
+ISA_MINOR = 3
 
 # The first four bytes of every module.
 MAGIC = b"DETR"
@@ -119,6 +119,10 @@ class Op(IntEnum):
     # byte-count frames
     FNB_BEGIN = 0x50
     FNB_END = 0x51
+
+    # length-prefixed strings
+    SREAD_TSTR = 0x52
+    SKIP_TSTR = 0x53
 
     # offsets
     OFFSET_AT = 0x60
