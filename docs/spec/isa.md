@@ -1,6 +1,6 @@
 # Instruction Set
 
-**Status: draft, ISA v0.2.** The opcode numbers in this document are generated from [isa.toml](../../spec/isa.toml); the prose is normative.
+**Status: draft, ISA v0.3.** The opcode numbers in this document are generated from [isa.toml](../../spec/isa.toml); the prose is normative.
 
 ## 1. Design decisions
 
@@ -17,6 +17,7 @@
 | Strings | interned ids | a register carries a `u32` id, never the bytes |
 | Buffer checks | always on | a stream violation raises, never crashes the process |
 | Byte-count frames | a stack in the machine | a counted object costs two instructions, and the machine can check the frame when the function returns |
+| Length-prefixed strings | one opcode, `SREAD_TSTR` | ROOT's `1`/`255`+`uint32` prefix is read in one dispatch and the characters become an arena id |
 
 ## 2. Instruction encoding
 
@@ -176,7 +177,18 @@ A ROOT object framed by its byte count declares how many bytes follow it. These 
 
 The stack is machine state, not module state: two runs never share it, and `reset()` drops it. A module that never emits `FNB_BEGIN` is unaffected, because its depth is always zero.
 
-## 9. Event offsets (0x60–0x62)
+## 9. Length-prefixed strings (0x52–0x53)
+
+ROOT writes a `TString` as a one-byte length followed by the characters; when that byte is `255`, a `uint32` length follows instead. The opcodes read both forms and either intern the characters as a name or skip them.
+
+| Opcode | Hex | Operands | Semantics |
+|---|---|---|---|
+| `SREAD_TSTR` | 0x52 | `rd` | Read a length-prefixed string, intern it, return its arena id. |
+| `SKIP_TSTR` | 0x53 | — | Skip a length-prefixed string. |
+
+`SREAD_TSTR` is the length-prefixed counterpart of `SREAD_CSTR`, and the string-arena counterpart of `READ_STRING`: it produces an id a register can carry, where `READ_STRING` appends the characters to a byte buffer. `SKIP_TSTR` is its skip form. A length past the end of the event raises `StreamUnderflow`, and the cursor is left just after the length field.
+
+## 10. Event offsets (0x60–0x62)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -186,7 +198,7 @@ The stack is machine state, not module state: two runs never share it, and `rese
 
 `OFFSET_SEEK` is the primitive that finds the end of a jagged array without a linear scan in the decoder.
 
-## 10. Coarse-grained reads (0x70–0x75)
+## 11. Coarse-grained reads (0x70–0x75)
 
 These are the performance tier. A machine SHOULD implement them as native loops, not as a dispatch per element.
 
@@ -205,7 +217,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 
 `READ_BULK` and `READ_APPEND` convert the stream value to the buffer dtype. An integer buffer wraps modulo its width; a float buffer receives the IEEE-754 bit pattern of a float typecode, or a real value when the typecode is integral.
 
-## 11. Buffer access (0x80–0x86)
+## 12. Buffer access (0x80–0x86)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -219,7 +231,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 
 `BUF_APPEND_OFFSET` requires an `OFFSETS` buffer with at least one element. `BUF_LAST` on an empty buffer raises `DetreeError`. `BUF_RESERVE` has no effect on the output; it is a capacity hint.
 
-## 12. Program state (0x90–0x92)
+## 13. Program state (0x90–0x92)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -227,7 +239,7 @@ These are the performance tier. A machine SHOULD implement them as native loops,
 | `STATE_SET` | 0x91 | `SLOT`, `ra` | `states[SLOT] = ra`. |
 | `STATE_IADD` | 0x92 | `SLOT`, `IMM` | `states[SLOT] += IMM` (wrapping). |
 
-## 13. Object references (0xA0–0xA5)
+## 14. Object references (0xA0–0xA5)
 
 The reference table maps a `u32` tag to an object index and an optional class name. It is the primitive behind ROOT object graphs.
 
@@ -240,7 +252,7 @@ The reference table maps a `u32` tag to an object index and an optional class na
 | `REF_SET_CLASS` | 0xA4 | `ra`, `rb` | `refs[ra].class = rb`. |
 | `REF_COUNT` | 0xA5 | `rd` | Number of entries. |
 
-## 14. Strings (0xB0–0xB3)
+## 15. Strings (0xB0–0xB3)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -251,7 +263,7 @@ The reference table maps a `u32` tag to an object index and an optional class na
 
 The arena is per run and seeded with the module's constants in order. `-1` means "no string"; it is not a valid index.
 
-## 15. Verification and errors (0xC0–0xC3)
+## 16. Verification and errors (0xC0–0xC3)
 
 | Opcode | Hex | Operands | Semantics |
 |---|---|---|---|
@@ -260,9 +272,9 @@ The arena is per run and seeded with the module's constants in order. `-1` means
 | `ASSERT_STR_EQ` | 0xC2 | `ra`, `rb`, `MSG` | Fail unless two string ids are equal. |
 | `THROW` | 0xC3 | `MSG` | Raise an unconditional decoder error. |
 
-## 16. Worked examples
+## 17. Worked examples
 
-### 16.1 A scalar decoder
+### 17.1 A scalar decoder
 
 Read one value per event and append it to `data`:
 
@@ -272,7 +284,7 @@ Read one value per event and append it to `data`:
   RET         r0
 ```
 
-### 16.2 A sequence decoder
+### 17.2 A sequence decoder
 
 Read a count, append the next offset, then read the elements in bulk:
 
@@ -283,7 +295,7 @@ Read a count, append the next offset, then read the elements in bulk:
   RET                r0
 ```
 
-### 16.3 A jagged array
+### 17.3 A jagged array
 
 Find the next entry offset and let a child decoder read until it:
 
@@ -295,7 +307,7 @@ Find the next entry offset and let a child decoder read until it:
   RET            r2
 ```
 
-### 16.4 A `TObject` header
+### 17.4 A `TObject` header
 
 ```text
   SKIP_VERSION
@@ -314,7 +326,7 @@ L1:
   RET          r0
 ```
 
-### 16.5 A counted object
+### 17.5 A counted object
 
 The object declares its size, so the machine holds the end position while the members are read:
 
@@ -328,7 +340,7 @@ The object declares its size, so the machine holds the end position while the me
 
 `FNB_END` fails where the old sequence would have compared a register: the machine knows the expected offset, so the message can name both it and the cursor.
 
-## 17. Performance requirements
+## 18. Performance requirements
 
 The machine's cost is dominated by dispatch frequency. A compiler SHOULD keep hot loops inside coarse opcodes:
 
@@ -343,10 +355,10 @@ The machine's cost is dominated by dispatch frequency. A compiler SHOULD keep ho
 
 A decoder that executes three or more instructions per element will be several times slower than a native decoder graph.
 
-## 18. Reserved opcodes
+## 19. Reserved opcodes
 
-The following ranges are reserved and MUST NOT be emitted in v0.2:
+The following ranges are reserved and MUST NOT be emitted in v0.3:
 
-`0x0D–0x0F`, `0x2A–0x2F`, `0x3F`, `0x52–0x5F`, `0x63–0x6F`, `0x76–0x7F`, `0x87–0x8F`, `0x93–0x9F`, `0xA6–0xAF`, `0xB4–0xBF`, `0xC4–0xFF`.
+`0x0D–0x0F`, `0x2A–0x2F`, `0x3F`, `0x54–0x5F`, `0x63–0x6F`, `0x76–0x7F`, `0x87–0x8F`, `0x93–0x9F`, `0xA6–0xAF`, `0xB4–0xBF`, `0xC4–0xFF`.
 
-A module that contains an opcode outside the v0.2 table is invalid and MUST be rejected at validation with `DETREE_MODULE_ERROR`. A machine does not guess the width or meaning of an opcode it does not know.
+A module that contains an opcode outside the v0.3 table is invalid and MUST be rejected at validation with `DETREE_MODULE_ERROR`. A machine does not guess the width or meaning of an opcode it does not know.

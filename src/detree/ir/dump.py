@@ -53,6 +53,8 @@ def _expr(expr: nodes.Expr) -> str:
         return "stream_read_version()"
     if isinstance(expr, nodes.StreamReadCString):
         return "stream_read_cstr()"
+    if isinstance(expr, nodes.StreamReadTString):
+        return "stream_read_tstring()"
     if isinstance(expr, nodes.Unary):
         return f"unary({_op(expr.op)}, {_expr(expr.x)})"
     if isinstance(expr, nodes.Binary):
@@ -153,6 +155,8 @@ def _stmts(body: list, indent: int) -> list[str]:
             lines.append(f"{pad}skip_objhdr")
         elif isinstance(stmt, nodes.SkipCStr):
             lines.append(f"{pad}skip_cstr")
+        elif isinstance(stmt, nodes.SkipTString):
+            lines.append(f"{pad}skip_tstring")
         elif isinstance(stmt, nodes.SetCursor):
             lines.append(f"{pad}set_cursor {_expr(stmt.value)}")
         elif isinstance(stmt, nodes.CallStmt):

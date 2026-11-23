@@ -198,7 +198,7 @@ def _type_of(expr: nodes.Expr, ctx: _Context) -> str:
         return nodes.I64
     if isinstance(expr, (nodes.StreamReadFNB, nodes.StreamReadVersion)):
         return nodes.I64
-    if isinstance(expr, nodes.StreamReadCString):
+    if isinstance(expr, (nodes.StreamReadCString, nodes.StreamReadTString)):
         return nodes.STR
     if isinstance(expr, nodes.Unary):
         if op_of(expr.op) not in _UNARY_OPS:
@@ -417,6 +417,7 @@ def _check_stmt(stmt: nodes.Stmt, ctx: _Context) -> None:
             nodes.SkipTObject,
             nodes.SkipObjHdr,
             nodes.SkipCStr,
+            nodes.SkipTString,
         ),
     ):
         return

@@ -187,6 +187,55 @@ def streams() -> Case:
     return _one("streams", builder, data)
 
 
+def tstrings() -> Case:
+    """
+    A `TString` in both length forms, interned and compared in the arena.
+    """
+    builder = Builder()
+    out = builder.buffer("out", "int64")
+    state = builder.state("name", init=-1, is_string=True)
+    short = builder.string("hi")
+    long = builder.string("abc")
+    builder.function(
+        "read",
+        [
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.STR_CONST, rd=1, imm1=short),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.STR_STORE, imm1=state, ra=0),
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.STR_CONST, rd=1, imm1=long),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.STR_LOAD, rd=0, imm1=state),
+            ins(Op.STR_CONST, rd=1, imm1=short),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=3,
+    )
+    data = b"\x02hi" + b"\xff" + struct.pack(">I", 3) + b"abc"
+    return _one("tstrings", builder, data)
+
+
+def tstring_underflow() -> Case:
+    """
+    A `TString` whose length runs past the end of the event.
+    """
+    builder = Builder()
+    builder.function(
+        "read",
+        [
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=1,
+    )
+    return _one("tstring_underflow", builder, b"\x05ab")
+
+
 def skips() -> Case:
     builder = Builder()
     out = builder.buffer("out", "int64")
@@ -198,6 +247,7 @@ def skips() -> Case:
             ins(Op.SKIP_R, ra=0),
             ins(Op.SKIP_VERSION),
             ins(Op.SKIP_CSTR),
+            ins(Op.SKIP_TSTR),
             ins(Op.SKIP_TOBJECT),
             ins(Op.SKIP_OBJHDR),
             ins(Op.CURSOR, rd=1),
@@ -211,6 +261,7 @@ def skips() -> Case:
         + b"de"
         + b"\x00\x00"
         + b"x\x00"
+        + b"\x03abc"
         + b"\x00" * 6
         + struct.pack(">I", 0x10)
         + b"\x00" * 2
@@ -608,6 +659,8 @@ CASES = (
     comparisons,
     control,
     streams,
+    tstrings,
+    tstring_underflow,
     skips,
     offsets,
     bulk,

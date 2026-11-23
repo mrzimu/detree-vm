@@ -73,6 +73,7 @@ _RD = frozenset(
         Op.SREAD_FNB,
         Op.SREAD_VERSION,
         Op.SREAD_CSTR,
+        Op.SREAD_TSTR,
         Op.CURSOR,
         Op.ENTRIES,
         Op.INIT_OFFSET,

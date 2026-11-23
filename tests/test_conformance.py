@@ -547,6 +547,56 @@ def test_fnb_version_and_cstr(machine_factory):
     assert states["name"] == "abc"
 
 
+def test_tstring_both_length_forms(machine_factory):
+    builder = Builder()
+    out = builder.buffer("out", "int64")
+    state = builder.state("name", init=-1, is_string=True)
+    short = builder.string("hi")
+    long = builder.string("abc")
+    builder.function(
+        "read",
+        [
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.STR_CONST, rd=1, imm1=short),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.STR_STORE, imm1=state, ra=0),
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.STR_CONST, rd=1, imm1=long),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.STR_LOAD, rd=0, imm1=state),
+            ins(Op.STR_CONST, rd=1, imm1=short),
+            ins(Op.STR_EQ, rd=2, ra=0, rb=1),
+            ins(Op.BUF_APPEND, imm1=out, ra=2),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=3,
+    )
+    data = b"\x02hi" + b"\xff" + struct.pack(">I", 3) + b"abc"
+
+    outputs, states, _ = run(machine_factory, builder, data)
+
+    assert outputs["out"].tolist() == [1, 1, 1]
+    assert states["name"] == "hi"
+
+
+def test_tstring_underflow(machine_factory):
+    builder = Builder()
+    builder.function(
+        "read",
+        [
+            ins(Op.SREAD_TSTR, rd=0),
+            ins(Op.RET, ra=0),
+        ],
+        reg_count=1,
+    )
+
+    machine = machine_factory(builder.build().to_bytes())
+    with pytest.raises(StreamUnderflow):
+        machine.run(b"\x05ab", [0, 3])
+
+
 def test_string_missing_is_none(machine_factory):
     builder = Builder()
     out = builder.buffer("out", "int64")
@@ -581,22 +631,23 @@ def test_skips_and_cursor(machine_factory):
             ins(Op.SKIP_R, ra=0),
             ins(Op.SKIP_VERSION),
             ins(Op.SKIP_CSTR),
+            ins(Op.SKIP_TSTR),
             ins(Op.CURSOR, rd=1),
             ins(Op.BUF_APPEND, imm1=out, ra=1),
             ins(Op.SET_CURSOR, ra=0),
             ins(Op.CURSOR, rd=1),
             ins(Op.BUF_APPEND, imm1=out, ra=1),
-            ins(Op.CONST, rd=0, imm1=9),
+            ins(Op.CONST, rd=0, imm1=17),
             ins(Op.SET_CURSOR, ra=0),
             ins(Op.RET, ra=0),
         ],
         reg_count=2,
     )
-    data = b"abc" + b"de" + b"\x00\x00" + b"x\x00"
+    data = b"abc" + b"de" + b"\x00\x00" + b"x\x00" + b"\xff" + struct.pack(">I", 3) + b"abc"
 
     outputs, _, _ = run(machine_factory, builder, data)
 
-    assert outputs["out"].tolist() == [9, 2]
+    assert outputs["out"].tolist() == [17, 2]
 
 
 def test_skip_object_headers(machine_factory):

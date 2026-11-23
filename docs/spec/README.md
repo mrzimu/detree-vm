@@ -1,6 +1,6 @@
 # Detree Specification
 
-**Status: draft, ISA v0.2.** This directory is the normative definition of the Detree machine. It is written for compiler authors and machine implementers, and it is independent of any particular downstream project.
+**Status: draft, ISA v0.3.** This directory is the normative definition of the Detree machine. It is written for compiler authors and machine implementers, and it is independent of any particular downstream project.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 

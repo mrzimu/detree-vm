@@ -1,6 +1,6 @@
 # Machine Model
 
-**Status: draft, ISA v0.2.**
+**Status: draft, ISA v0.3.**
 
 A **machine** is built once from a module's bytes and then reads basket after basket. It owns the per-basket event loop; bytecode never sees the loop.
 
@@ -55,7 +55,7 @@ The reference table maps a `u32` tag to an object index and an optional class na
 
 ## 6. Strings
 
-The arena is seeded with the module's string constants in order, so constant index `k` is a stable id. `SREAD_CSTR` interns the bytes it reads. Ids are valid only for the current run; they MUST NOT be compared across runs.
+The arena is seeded with the module's string constants in order, so constant index `k` is a stable id. `SREAD_CSTR` interns the bytes it reads, and so does `SREAD_TSTR` for a length-prefixed one. Ids are valid only for the current run; they MUST NOT be compared across runs.
 
 ## 7. Calling convention
 
