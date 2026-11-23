@@ -449,8 +449,7 @@ namespace detree {
             const std::size_t length = static_cast<std::size_t>( size );
             need( length );
             m_cursor += length;
-            const std::string text( reinterpret_cast<const char*>( m_data + start ),
-                                    length );
+            const std::string text( reinterpret_cast<const char*>( m_data + start ), length );
             reg( ins.rd ) = intern( text );
             return;
         }
